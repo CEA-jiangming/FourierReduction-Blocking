@@ -1,9 +1,9 @@
 function [u, v, uw, vw, Nm] = util_gen_sampling_pattern(pattern, param)
 
-if ~isfield(param, 'fpartition') && ~isfield(param, 'fpartition_x') && ~isfield(param, 'fpartition_y')
-    % symetric partitioning
-    param.fpartition = [-pi pi];
-end
+% if ~isfield(param, 'fpartition') && ~isfield(param, 'fpartition_x') && ~isfield(param, 'fpartition_y')
+%     % symetric partitioning
+%     param.fpartition = [-pi pi];
+% end
 if isfield(param, 'fpartition')
     % symetric partitioning
     param.fpartition_y = param.fpartition;

@@ -33,12 +33,6 @@ function [xsol, L1_v, L1_vp, L2_v, L2_vp, delta_v, sol_v, snr_v, v1, v2, sol_rew
 R = length(y);
 P = length(Psit);
 
-% oversampling vectorized data length
-% No = size(W{1}, 1);
-
-% number of pixels
-% N = numel(At(zeros(No, 1)));
-% [Ny, Nx] = size(At(zeros(No, 1)));
 Ny = imsize(1);
 Nx = imsize(2);
 

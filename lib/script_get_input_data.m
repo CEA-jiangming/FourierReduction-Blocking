@@ -318,6 +318,7 @@ if gen_data == 1
         param_sampling.N = N; % number of pixels in the image
         param_sampling.Nox = ox*Nx; % number of pixels in the image
         param_sampling.Noy = oy*Ny; % number of pixels in the image
+        util_gen_sampling_pattern_config; % Set all parameters
         
         [uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
 
@@ -359,11 +360,13 @@ if gen_data == 1
         yf = cell(num_tests, 1);
         input_snr_v = cell(num_tests, 1);
         
+        use_different_per_block_input_snr = 0;
+        per_block_input_snr_delta = 0;
+        
         %% generate noisy input data
         for k = 1:num_tests
             [y0{k}, y{k}, y0f{k}, yf{k}, aY{k}, input_snr_v{k}, im_C] = util_gen_input_data(im, G, W, A, input_snr, ...
-                use_different_per_block_input_snr, per_block_input_snr_delta, uvidx, ...
-                param_image_var);
+                use_different_per_block_input_snr, per_block_input_snr_delta, uvidx);
 
             if use_symmetric_fourier_sampling
                 y0f{k} = [y0f{k}(uvidx{k}(1:end/2)); conj(y0f{k}(uvidx{k}(1:end/2)))];

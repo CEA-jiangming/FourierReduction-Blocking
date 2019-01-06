@@ -6,21 +6,36 @@ if ~isfield(param, 'uniform_partitioning_no'), param.uniform_partitioning_no = 1
 
 if param.use_uniform_partitioning
     nb_sing = length(Sigma);
-    step = floor(nb_sing/param.uniform_partitioning_no);
-    masks = cell(param.uniform_partitioning_no,1);
-    [masks{:}] = deal(sparse(false(length(mask),1)));        % Initialization, each cell element is a vector of image size
-    beg_ind = 1;                                     % Beginning index of the mask under processing
+    step = floor(nb_sing/param.uniform_partitioning_no);    
+    beg_ind = 1;                                     % Beginning index
+    mask_ind = find(mask);                           % Index vector of singular values
     for i = 1:param.uniform_partitioning_no-1
-        tmp = find(mask(beg_ind:end), step, 'first');    % Find non-zero elements of the mask which have not been treated, the number of non-zero elements corresponds to the size of block.
-        end_ind = tmp(end);                          % Ending non-zero index of the sub-mask
-        masks{i,1}(beg_ind:beg_ind+end_ind-1) = mask(beg_ind:beg_ind+end_ind-1);
-        beg_ind = beg_ind + end_ind;                      % Update the beginning index
-        ind = (i-1)*step+1:i*step;
-        Sigmas{i} = Sigma(ind);
-        y{i} = x(ind);
+        masks{i} = mask_ind(beg_ind:beg_ind+step-1);
+        Sigmas{i} = Sigma(beg_ind:beg_ind+step-1);
+        y{i} = x(beg_ind:beg_ind+step-1);
+        beg_ind = beg_ind + step;
     end
-    masks{param.uniform_partitioning_no,1}(beg_ind:end) = mask(beg_ind:end);
-    ind = (param.uniform_partitioning_no-1)*step+1:nb_sing;
-    Sigmas{param.uniform_partitioning_no} = Sigma(ind);
-    y{param.uniform_partitioning_no} = x(ind);
+    % The last partition may contain different number of elements
+    masks{param.uniform_partitioning_no} = mask_ind(beg_ind:end);
+    Sigmas{param.uniform_partitioning_no} = Sigma(beg_ind:end);
+    y{param.uniform_partitioning_no} = x(beg_ind:end);
+    
+elseif param.use_sort_uniform_partitioning
+    nb_sing = length(Sigma);
+    step = floor(nb_sing/param.uniform_partitioning_no);  
+    beg_ind = 1;                                     % Beginning index
+    mask_ind = find(mask);                           % Index vector of singular values
+    [Sigma_sort, ind_sort] = sort(Sigma);
+    mask_ind_sort = mask_ind(ind_sort);
+    x_sort = x(ind_sort);
+    for i = 1:param.uniform_partitioning_no-1
+        masks{i} = mask_ind_sort(beg_ind:beg_ind+step-1);
+        Sigmas{i} = Sigma_sort(beg_ind:beg_ind+step-1);
+        y{i} = x_sort(beg_ind:beg_ind+step-1);
+        beg_ind = beg_ind + step;
+    end
+    % The last partition may contain different number of elements
+    masks{param.uniform_partitioning_no} = mask_ind_sort(beg_ind:end);
+    Sigmas{param.uniform_partitioning_no} = Sigma_sort(beg_ind:end);
+    y{param.uniform_partitioning_no} = x_sort(beg_ind:end);
 end

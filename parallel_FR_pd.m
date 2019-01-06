@@ -2,14 +2,15 @@ close all
 clear variables
 clc
 
-visibSize = 5 * 256 * 256;
+visibSize = 5 * 64 * 64;
 input_snr = 40;
-image_file_name = './data/images/M31_256.fits';
+image_file_name = './data/images/M31_64.fits';
 coveragefile = '.data/vis/uv.fits';
 klargestpercent = 50;  % Percent of image size to keep after dimensionality reduction
 run = 1;
-usingReduction = 1;
-usingReductionPar = 1;
+usingReduction = 0;
+usingReductionPar = 0;
+normalize_data = 0;
 
 addpath data
 addpath data/images
@@ -38,7 +39,7 @@ free_memory = 0;
 save_dataset_number = 5; % number of the dataset to write files to
 save_dataset_subnumber = 0; % number of the dataset to write files to
 
-save_data_on_disk = 0; % flag
+save_data_on_disk = 1; % flag
 save_eps_files = 0; % flag
 save_path = 'results/rsing/';
 
@@ -79,6 +80,7 @@ run_fb_nnls = 0; % flag
 
 %% real data generation
 use_real_visibilities = 0;
+use_simulated_data = ~use_real_visibilities;
 
 %% various config parameters
 verbosity = 1;
@@ -92,7 +94,7 @@ use_gridded_data = 0; % flag setting for generating gridded data
 
 % evl params
 
-compute_evl = 0;
+compute_evl = 1;
 compute_evl_no_natw = 0;
 compute_evl_precond = 0;
 compute_block_op_norm = 0; % flag to compute the operator norm for each block
@@ -137,6 +139,7 @@ param_fouRed.klargestpercent = klargestpercent;
 param_fouRed.diagthresholdepsilon = 1e-10; 
 param_fouRed.covmatfileexists = 0;
 param_fouRed.covmatfile = 'covariancemat.mat';
+param_fouRed.fastCov = 1;
 
 %% block structure
 
@@ -153,9 +156,10 @@ param_block_structure.partition = [1000 2000 4000];
 param_block_structure.use_equal_partitioning = 1;
 param_block_structure.equal_partitioning_no = 1;
 
-%% Singularities-based block structure
+%% Singular values based block structure
 param_sing_block_structure.use_uniform_partitioning = 1;
-param_sing_block_structure.uniform_partitioning_no = 8;
+param_sing_block_structure.use_sort_uniform_partitioning = 0;
+param_sing_block_structure.uniform_partitioning_no = 4;
 
 %% preconditioning
 
@@ -165,11 +169,14 @@ param_precond.uniform_weight_sub_pixels = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Generating new data ... \n\n');
 %% image and data loading
-[im, N, Ny, Nx] = util_read_image(image_file_name);
 
 uvfile = './data/uv.mat';
-util_create_pool(12);
-script_fouRed_gen_input_data;               % script to generate input data with Fourier reduction integrated
+% util_create_pool(12);
+if usingReduction
+    script_fouRed_get_input_data;               % script to generate input data with Fourier reduction integrated
+else
+    script_get_input_data;
+end
 
 %% PDFB parameter structure sent to the algorithm
 param_pdfb.im = im; % original image, used to compute the SNR

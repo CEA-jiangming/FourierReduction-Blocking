@@ -8,6 +8,7 @@ image_file_name = './data/images/M31_256.fits';
 coveragefile = '.data/vis/uv.fits';
 klargestpercent = 50;  % Percent of image size to keep after dimensionality reduction
 run = 1;
+normalize_data = 1;
 block_no = [2,4,8,16];
 
 result_snr = [];
@@ -105,6 +106,7 @@ param_fouRed.klargestpercent = klargestpercent;
 param_fouRed.diagthresholdepsilon = 1e-10; 
 param_fouRed.covmatfileexists = 0;
 param_fouRed.covmatfile = 'covariancemat.mat';
+param_fouRed.fastCov = 1;
 
 %% block structure
 
@@ -121,9 +123,9 @@ param_block_structure.partition = [1000 2000 4000];
 param_block_structure.use_equal_partitioning = 1;
 param_block_structure.equal_partitioning_no = 1;
 
-%% Singularities-based block structure
+%% Singular values based block structure
 param_sing_block_structure.use_uniform_partitioning = 1;
-param_sing_block_structure.uniform_partitioning_no = 1;
+param_sing_block_structure.use_sort_uniform_partitioning = 0;
 
 %% preconditioning
 
@@ -139,14 +141,15 @@ uvfile = './data/uv.mat';
 
 if gen_data
     sampling_pattern = 'gaussian+large-holes';
+    
+    [im, N, Ny, Nx] = util_read_image(image_file_name);
 
+    param_sampling.N = N; % number of pixels in the image
+    param_sampling.Nox = ox*Nx; % number of pixels in the image
+    param_sampling.Noy = oy*Ny; % number of pixels in the image
     util_gen_sampling_pattern_config; % Set all parameters
-    sparam.N = N; % number of pixels in the image
-    sparam.Nox = ox*Nx; % number of pixels in the image
-    sparam.Noy = oy*Ny; % number of pixels in the image
-    sparam.p = ceil(visibSize/N);
 
-    [~, ~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, sparam);
+    [~, ~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
 
     save(uvfile,'uw','vw')
 else
@@ -176,31 +179,23 @@ G = Gw(:, W);
 [Psiw, Psitw] = op_sp_wlt_basis(wlt_basis, nlevel, Ny, Nx);
 
 %% generate noisy input data
-use_different_per_block_input_snr = 0;
-per_block_input_snr_delta = 0;
-
-param_image_var.use_image_variation = 0;
-
-y0 = cell(num_tests);
-y = cell(num_tests);
-noise = cell(num_tests);
-yT = cell(num_tests);
-epsilon = cell(num_tests);
-epsilons = cell(num_tests);
-epsilonT = cell(num_tests);
-epsilonTs = cell(num_tests);
-
+ 
 for k = 1:num_tests
-    [y0{k}{1}, y{k}{1}, ~, sigma_noise, noise{k}] = util_gen_input_data_noblock(im, G, W, A, input_snr);
+    % cell structure to adapt to the previous solvers
+    if normalize_data
+        [y0{k}{1}, ~, y{k}{1}, ~, sigma_noise,~, noise{k}{1}] = util_gen_input_data_noblock(im, G, W, A, input_snr);
+    else
+        [y0{k}{1}, y{k}{1}, ~, ~, sigma_noise, noise{k}{1}, ~] = util_gen_input_data_noblock(im, G, W, A, input_snr);
+    end        
 end
 
 
-%% Fourier reduction and operators
-util_create_pool(num_workers);
-% Continuous-to-gridding projection operator FPhi, singular matrix Sigma, mask matrix (to reduce the dimension)
-[FPhi, FPhit, Sigma, Mask] = fourierReduction(Gw, A, At, [Ny, Nx], param_fouRed);
+%% For dimensionality reduction
+    
+% psf operator Ipsf, singular value matrix Sigma, mask matrix (to reduce the dimension)
+[Ipsf, Sigma, Mask] = fourierReduction(Gw, A, At, [Ny, Nx], param_fouRed);
 % New measurement operator C, new reduced measurement operator B
-[C, Ct, B, Bt] = oper_fourierReduction(FPhi, FPhit, Sigma, Mask, Gw, A, At, [Ny, Nx]);
+[C, Ct, B, Bt] = oper_fourierReduction(Ipsf, Sigma, Mask, [Ny, Nx]);
 
 evl = op_norm(B, Bt, [Ny, Nx], 1e-4, 200, verbosity);
 
@@ -209,25 +204,31 @@ for j = block_no
     %% Block (over singularities) structure
     % Embed the y using the same reduction
     for k = 1:num_tests
-        ry = FPhi(y{k}{1});
+        ry = fftshift(fft2(ifftshift(At(Gw'*y{k}{1}))));
+        ry = ry(:);
         yTmat = Sigma.*ry(Mask);
 
         [yT{k}, T, W] = util_gen_sing_block_structure(yTmat, Sigma, Mask, param_sing_block_structure);
+        
     end
 
     %Bound for the L2 norm
     fprintf('Computing epsilon bound... ');
     tstart1=tic;      
 
+    % Embed the noise
     for k = 1:num_tests
-        rn = FPhi(noise{k});      
+        % Apply F Phi
+        rn = fftshift(fft2(ifftshift(At(Gw'*noise{k}{1}))));
+        rn = rn(:);
+
+        % factorized by singular values      
         for i = 1:length(T)
             epsilonT{k}{i} = norm(T{i} .* rn(W{i}));
             epsilonTs{k}{i} = 1.001*epsilonT{1}{i};
         end
         epsilon{k} = norm(cell2mat(epsilonT{k}));
         epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
-        epsilon_global(j,k) = norm(Sigma.*rn(Mask));
     end
         %%%%%%%%%%%%%%%
     fprintf('Done\n');
@@ -305,7 +306,10 @@ for j = block_no
         [result_st.sol{i}, result_st.L1_v{i}, result_st.L1_vp{i}, result_st.L2_v{i}, ...
             result_st.L2_vp{i}, result_st.delta_v{i}, result_st.sol_v{i}, result_st.snr_v{i}, ~, ~, result_st.sol_reweight_v{i}] ...
             = pdfb_bpcon_par_sing_sim_rescaled_adapt_eps(yT{i}, [Ny, Nx], epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, C, Ct, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
-
+        
+        if normalize_data
+           result_st.sol{i} = result_st.sol{i}*sigma_noise/sqrt(2);
+        end
 
         tend = toc(tstart_a);
         fprintf(' pdfb_bpcon_par_sing_sim_rescaled runtime: %ds\n\n', ceil(tend));

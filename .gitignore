@@ -1,3 +1,6 @@
 irt/*
 logs/*
 .DS_Store
+data/*
+*.mat
+*.m~

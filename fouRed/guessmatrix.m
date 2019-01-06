@@ -1,4 +1,4 @@
- function [matrix] = guessmatrix(diagonly, operator, matrixrows, matrixcols)
+function [matrix] = guessmatrix(diagonly, operator, matrixrows, matrixcols)
 % Guesses the matrix corresponding to a given operator
 % by operating on different delta vectors
 
@@ -12,9 +12,9 @@ for i=1:matrixcols
     deltacol = sparse(i, 1, 1, matrixcols, 1, 1);
     currcol = operator(deltacol);  % SLOW SLOW SLOW
     if diagonly
-%        if i > maxnonzeros
-%            break
-%        end
+       if i > maxnonzeros
+           break
+       end
         operdiag(i) = currcol(i);
     else
         matrix(:,i) = currcol;
