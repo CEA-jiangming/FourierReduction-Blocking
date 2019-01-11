@@ -55,7 +55,7 @@ G = Gw(:, W);
 %% generate noisy input data
  
 for k = 1:num_tests
-    % cell structure to adapt to the previous solvers
+    % cell structure to adapt to the solvers
     if normalize_data
         [y0{k}{1}, ~, y{k}{1}, ~, sigma_noise,~, noise{k}{1}] = util_gen_input_data_noblock(im, G, W, A, input_snr);
     else
@@ -79,13 +79,14 @@ for k = 1:num_tests
     ry = ry(:);
     yTmat = Sigma.*ry(Mask);
 
+    clear T W;
     if usingReductionPar
         [yT{k}, T, W] = util_gen_sing_block_structure(yTmat, Sigma, Mask, param_sing_block_structure);
     else
         % This section is to adapt to the current code structure 
-        T = mat2cell([1], 1);
-        W = mat2cell(true(size(yTmat)), length(yTmat));
-        yT{k} = mat2cell(yTmat, length(yTmat));
+        T = {Sigma};
+        W = {Mask};
+        yT{k} = {yTmat};
     end
 end
 
@@ -98,23 +99,14 @@ for k = 1:num_tests
     % Apply F Phi
     rn = fftshift(fft2(ifftshift(At(Gw'*noise{k}{1}))));
     rn = rn(:);
-
-    % factorized by singular values
-    if usingReductionPar        
-        for i = 1:length(T)
-            epsilonT{k}{i} = norm(T{i} .* rn(W{i}));
-            epsilonTs{k}{i} = 1.001*epsilonT{1}{i};
-        end
-        epsilon{k} = norm(cell2mat(epsilonT{k}));
-        epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
-    else
-        epsilon{k} = norm(Sigma .* rn(Mask));
-        % epsilon = step_epsilon; % set epsilon value BEFORE running this script
-        epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
-%         histogrampeakiness = mean(d12rnnorms)/std(d12rnnorms);
-        epsilonT{k}{1} = epsilon{k};
-        epsilonTs{k}{1} = epsilons{k};
+    
+    % factorized by singular values and compute l2 ball       
+    for i = 1:length(T)
+        epsilonT{k}{i} = norm(T{i} .* rn(W{i}));
+        epsilonTs{k}{i} = 1.001*epsilonT{1}{i};
     end
+    epsilon{k} = norm(cell2mat(epsilonT{k}));
+    epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
 end
 
     %%%%%%%%%%%%%%%

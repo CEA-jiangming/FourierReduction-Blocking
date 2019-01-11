@@ -8,9 +8,9 @@ image_file_name = './data/images/M31_64.fits';
 coveragefile = '.data/vis/uv.fits';
 klargestpercent = 50;  % Percent of image size to keep after dimensionality reduction
 run = 1;
-usingReduction = 0;
+usingReduction = 1;
 usingReductionPar = 0;
-normalize_data = 0;
+normalize_data = 1;
 
 addpath data
 addpath data/images
@@ -47,8 +47,8 @@ num_tests = 1;
 num_workers = 1; % number of tests to run in parallel; should be less than
                  % the number of cores and is limited by the system memory for the variables
 
-run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReductionPar);
-run_pdfb_bpcon_par_sim_rescaled = ~logical(usingReductionPar); % flag  
+run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReduction);
+run_pdfb_bpcon_par_sim_rescaled = 0; % flag  
 run_pdfb_bpcon_par_sim_rescaled_natw = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par = 0; % flag

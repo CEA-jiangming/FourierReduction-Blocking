@@ -299,9 +299,10 @@ for i = 1:num_tests
 
     tstart_a = tic;
     fprintf(' Running pdfb_bpcon_par_sim_rescaled\n');
+        
     [result_st.sol{i}, result_st.L1_v{i}, result_st.L1_vp{i}, result_st.L2_v{i}, ...
             result_st.L2_vp{i}, result_st.delta_v{i}, result_st.sol_v{i}, result_st.snr_v{i}, ~, ~, result_st.sol_reweight_v{i}] ...
-            = pdfb_bpcon_par_sim_rescaled_adapt_eps(yT{i}, epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, B, Bt, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
+            = pdfb_bpcon_par_sing_sim_rescaled_adapt_eps(yT{i}, [Ny, Nx], epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, C, Ct, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
         
     if normalize_data
        result_st.sol{i} = result_st.sol{i}*sigma_noise/sqrt(2);

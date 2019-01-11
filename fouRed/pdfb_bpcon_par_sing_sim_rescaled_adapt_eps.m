@@ -322,12 +322,12 @@ for t = 1:param.max_iter
     ns_p = cell(R, 1);
    
     % select parts to be sent to nodes
-    parfor q = 1:R
+    for q = 1:R
         ns_p{q} = ns(W{q});
     end
     
     % parallel for all R blocks
-    parfor q = 1:R
+    for q = 1:R
         r2{q} = T{q} .* ns_p{q};
         vy2{q} = v2{q} + r2{q} - y{q} - sc(v2{q} + r2{q} - y{q}, epsilont{q});
         v2{q} = v2{q} + lambda2 * (vy2{q} - v2{q});
