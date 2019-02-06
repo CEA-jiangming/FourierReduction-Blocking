@@ -65,13 +65,22 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% For dimensionality reduction
-    
+
+if normalize_data
+    Gw = sqrt(2)/sigma_noise * Gw;      % Whitening G matrix (embed natural weighting in the measurement operator)
+end
+
+if param_fouRed.enable_estimatethreshold
+    param_fouRed.x2 = norm(im);
+    param_fouRed.noise = noise{k}{1};
+end
+
+fprintf('\nDimensionality reduction...');
 % psf operator Ipsf, singular value matrix Sigma, mask matrix (to reduce the dimension)
 [Ipsf, Sigma, Mask] = fourierReduction(Gw, A, At, [Ny, Nx], param_fouRed);
 % New measurement operator C, new reduced measurement operator B
 [C, Ct, B, Bt] = oper_fourierReduction(Ipsf, Sigma, Mask, [Ny, Nx]);
-
-evl = op_norm(B, Bt, [Ny, Nx], 1e-4, 200, verbosity);
+fprintf('\nDimensionality reduction is finished');
 
 % Embed the y using the same reduction
 for k = 1:num_tests
@@ -82,12 +91,28 @@ for k = 1:num_tests
     clear T W;
     if usingReductionPar
         [yT{k}, T, W] = util_gen_sing_block_structure(yTmat, Sigma, Mask, param_sing_block_structure);
+        if usingPrecondition
+            R = length(W);
+            aW = cell(R,1);
+            for q = 1:R
+                aW{q} = 1./T{q};
+            end
+        end
     else
         % This section is to adapt to the current code structure 
         T = {Sigma};
         W = {Mask};
         yT{k} = {yTmat};
+        if usingPrecondition
+            aW = {1./T{1}};
+        end
     end
+end
+
+if usingPrecondition
+    evl = op_norm(@(x) sqrt(cell2mat(aW)) .* B(x), @(x) Bt(sqrt(cell2mat(aW)) .* x), [Ny, Nx], 1e-6, 200, verbosity);
+else
+    evl = op_norm(B, Bt, [Ny, Nx], 1e-4, 200, verbosity); 
 end
 
 %Bound for the L2 norm

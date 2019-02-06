@@ -1,31 +1,33 @@
-close all
-clear variables
-clc
+% function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma)
 
-visibSize = 5 * 64 * 64;
+visibSize = 10 * 256 * 256;
 input_snr = 40;
-image_file_name = './data/images/M31_64.fits';
+image_file_name = './data/images/M31_256.fits';
 coveragefile = '.data/vis/uv.fits';
-klargestpercent = 50;  % Percent of image size to keep after dimensionality reduction
+% klargestpercent = 100;  % Percent of image size to keep after dimensionality reduction
 run = 1;
-usingReduction = 1;
+usingReduction = 0;
 usingReductionPar = 0;
 normalize_data = 1;
-
-addpath data
-addpath data/images
-addpath lib/
-addpath fouRed/
-% addpath src
-addpath irt/
-
-try
-    setup;
-catch ME
-    error('NUFFT library not found in location src/irt');
-end
-
-rng('shuffle');
+usingPrecondition = 1;
+enable_klargestpercent = 1;
+klargestpercent = 25;
+enable_estimatethreshold = 0;
+gamma = 3;
+% addpath data
+% addpath data/images
+% addpath lib/
+% addpath fouRed/
+% % addpath src
+% addpath irt/
+% 
+% try
+%     setup;
+% catch ME
+%     error('NUFFT library not found in location src/irt');
+% end
+% 
+% rng('shuffle');
 
 %% run parameters
 % 0 - loads new data from file based on the dataset number supplied
@@ -47,10 +49,11 @@ num_tests = 1;
 num_workers = 1; % number of tests to run in parallel; should be less than
                  % the number of cores and is limited by the system memory for the variables
 
-run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReduction);
-run_pdfb_bpcon_par_sim_rescaled = 0; % flag  
+run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReduction && ~usingPrecondition);
+run_pdfb_bpcon_par_sim_rescaled = logical(~usingReduction && ~usingPrecondition); % flag  
 run_pdfb_bpcon_par_sim_rescaled_natw = 0; % flag
-run_pdfb_bpcon_par_sim_rescaled_precond = 0; % flag
+run_pdfb_bpcon_par_sing_sim_rescaled_precond = logical(usingReduction && usingPrecondition); % flag
+run_pdfb_bpcon_par_sim_rescaled_precond = logical(~usingReduction && usingPrecondition); % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par_gs = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par_var_block_eps = 0; % flag
@@ -96,7 +99,7 @@ use_gridded_data = 0; % flag setting for generating gridded data
 
 compute_evl = 1;
 compute_evl_no_natw = 0;
-compute_evl_precond = 0;
+compute_evl_precond = 1;
 compute_block_op_norm = 0; % flag to compute the operator norm for each block
 
 use_symmetric_fourier_sampling = 0;
@@ -135,7 +138,10 @@ param_nufft.use_fft_on_gpu = 0; % gpu FFT
 param_nufft.use_nufft_blocks = 0;
 
 %% Fourier reduction parameters
-param_fouRed.klargestpercent = klargestpercent;  
+param_fouRed.enable_klargestpercent = enable_klargestpercent;
+param_fouRed.klargestpercent = klargestpercent;
+param_fouRed.enable_estimatethreshold = enable_estimatethreshold;
+param_fouRed.gamma = gamma;             % By using threshold estimation, the optimal theshold reads as gamma * sigma / ||x||_2
 param_fouRed.diagthresholdepsilon = 1e-10; 
 param_fouRed.covmatfileexists = 0;
 param_fouRed.covmatfile = 'covariancemat.mat';
@@ -193,7 +199,7 @@ param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
 param_pdfb.sol_steps = [inf]; % saves images at the given iterations
 
 param_pdfb.use_proj_elipse_fb = 1;
-param_pdfb.elipse_proj_max_iter = 10;
+param_pdfb.elipse_proj_max_iter = 200;
 param_pdfb.elipse_proj_min_iter = 1;
 param_pdfb.elipse_proj_eps = 1e-8; % precision of the projection onto the ellipsoid
 
@@ -206,6 +212,15 @@ param_pdfb.reweight_alpha = 1; % Alpha always 1
 param_pdfb.reweight_alpha_ff = 0.75; % 0.25 Too agressively reduces the weights, try 0.7, 0.8
 param_pdfb.reweight_abs_of_max = inf;
 param_pdfb.total_reweights = 20;
+
+param_pdfb.use_best_bound_steps = 0;
+param_pdfb.use_best_bound_eps = 0;
+param_pdfb.best_bound_reweight_steps = 0;
+param_pdfb.best_bound_steps = [inf];
+param_pdfb.best_bound_rel_obj = 1e-6;
+param_pdfb.best_bound_alpha = 1.0001; % stop criterion over eps bound
+param_pdfb.best_bound_alpha_ff = 0.998;
+param_pdfb.best_bound_stop_eps_v = 1.001*param_l2_ball.stop_eps_v; % the method stops if the eps bound goes below this
 
 param_pdfb.use_adapt_bound_eps = 0;
 param_pdfb.adapt_bound_steps = 100;
@@ -225,3 +240,4 @@ script_run_all_tests_serial;
 
 tend = toc(tstart);
 fprintf('All algorithms runtime: %ds\n\n', ceil(tend));
+% end

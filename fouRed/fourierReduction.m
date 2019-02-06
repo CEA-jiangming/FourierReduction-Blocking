@@ -1,13 +1,31 @@
 function [Ipsf, d12, Mask] = fourierReduction(Gw, A, At, imsize, param)
-% Flags
+
+% Flags monitoring
+
+if ~isfield(param,'enable_klargestpercent') && ~isfield(param,'enable_estimatethreshold')
+    param.enable_klargestpercent = 1;
+end
+
+if param.enable_klargestpercent
+    if ~isfield(param, 'klargestpercent') 
+        param.klargestpercent = 100; 
+    end
+    klargestpercent = param.klargestpercent;
+elseif param.enable_estimatethreshold
+    if ~isfield(param, 'gamma') 
+        param.gamma = 3; 
+    end
+    if ~isfield(param, 'x2') || ~isfield(param, 'noise')
+        error('Either ||x||_2 or noise is missing for the estimation of the threshold');
+    end
+    noise = param.noise;
+    gamma = param.gamma;
+    x2 = param.x2;
+end
 
 % Flag to pull up the values of elements of the holographic matrix
 % This is to avoid having VERY small values which might later explode
 % during computation of inverse or reciprocal.
-if ~isfield(param, 'klargestpercent') 
-    param.klargestpercent = 100; 
-end
-
 if ~isfield(param, 'diagthresholdepsilon') 
     param.diagthresholdepsilon = 1e-10; 
 end
@@ -20,24 +38,16 @@ if ~isfield(param, 'covmatfile')
     param.covmatfile = 'covariancemat.mat';
 end
 
+% Fast covariance matrix computation
 if ~isfield(param, 'fastCov')
-    param.fastCov = 0;
+    param.fastCov = 1;
 end
 
-klargestpercent = param.klargestpercent;
 diagthresholdepsilon = param.diagthresholdepsilon;
 covmatfileexists = param.covmatfileexists;
 covmatfile = param.covmatfile;
 fastCov = param.fastCov;
 
-
-% Flag to load from a previously saved covariance matrix file
-% covmatfileexists = 0;       % Read precomputed matrix 
-% covmatfile = 'data/savedfiles/covariancemat.mat';
-
-% Flag to set if we want to approximate D with an
-% identity matrix. Reset the flag to use the normal D.
-% (D is the diagonal aproximation of the covariance matrix)
 Ny = imsize(1);
 Nx = imsize(2);
 % Compute holographic matrix
@@ -48,15 +58,7 @@ serialise = @(x) x(:);
 
 Ipsf = @(x) At(H*A(reshape(x, Ny, Nx)));  % Phi^T Phi = At G' G A = At H A: vect -> vect
 
-% R = @(x) serialise(fft2(real(At(Gw'*x(:)))));   % F Phi^T: vect -> vect
-% Rt = @(x) Gw*serialise(A(real(ifft2(reshape(full(x), Ny, Nx)))));   % Phi F^T: vect -> vect
-% R = @(x) serialise(fftshift(fft2(ifftshift(At(Gw'*x(:))))));   % F Phi^T: vect -> vect
-% Rt = @(x) Gw*serialise(A(fftshift(ifft2(ifftshift(reshape(full(x), Ny, Nx))))));   % Phi F^T: vect -> vect
-
 fprintf('\nComputing covariance matrix...');
-% Takes a vectorized input
-%     covoperator = @(x) serialise(fft2(grid2img_fwd((Ny*Nx)*ifft2(reshape(full(x), [Ny, Nx])))));
-% covoperator = @(x) R(Rt(x));
 % Covariance operator F Phi^T Phi F^T = F At H A F^T = F Ipsf F^T
 covoperator = @(x) serialise(fftshift(fft2(ifftshift(Ipsf(fftshift(ifft2(ifftshift(reshape(full(x), Ny, Nx)))))))));
 diagonly = 1; % Only compute diagonal of covariance matrix FPhi^TPhiF^T
@@ -86,12 +88,21 @@ else
     d = diag(covariancemat); %*(sigma_noise^2)
     d = abs(d);
 end
-    
-% d = ones(size(d)); % Disable weighting, simply do FPhi^TPhiF^T. Throw away the diagonal of covariancemat
+
+% Singular values thresholding
 fprintf('\nPruning covariancemat according to eigenvalues (diagonal elements)...\n');
-Mask = (d >= prctile(d,100-klargestpercent));
+if param.enable_klargestpercent
+    Mask = (d >= prctile(d,100-klargestpercent));
+elseif param.enable_estimatethreshold
+    % Embed the noise
+    rn = fftshift(fft2(ifftshift(At(Gw'*noise))));  % Apply F Phi
+    th = gamma * std(rn(:)) / x2;
+    Mask = (d >= th);
+end
 d = d(Mask);
+fprintf('\nThe threshold is %e \n', min(d));
+
 d = max(diagthresholdepsilon, d);  % This ensures that inverting the values will not explode in computation
 d12 = 1./sqrt(d);
-% Mask = sparse(1:length(nonzerocols), nonzerocols, ones(length(nonzerocols), 1), length(nonzerocols), (Ny*Nx));
+
 end

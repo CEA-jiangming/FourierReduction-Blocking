@@ -58,7 +58,7 @@ if use_fb
     end
     
     for q = 1:R
-        r2 = T{q} * ns_p{q};
+        r2 = T{q} * ns_p{q};            % should adapt to Fourier reduction
         proj{q} = sqrt(pU{q}) .* solver_proj_elipse_fb(1 ./ pU{q} .* v2{q}, r2, y{q}, pU{q}, epsilont{q}, zeros(size(y{q})), max_iterations, min_iterations, eps);
     end
 end

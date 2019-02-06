@@ -7,7 +7,7 @@ mu = 1/max(U)^2;
 zdelta = inf;
 k = 0;
 while k < min_itr || (k < max_itr && zdelta > eps)
-    grad = U .* (z - alpha);
+    grad = U .* (z - alpha);                      
     zo = z;
     z = y + sc(z - mu * grad - y, epsilont);
     zdelta = norm(zo - z)/norm(z);
