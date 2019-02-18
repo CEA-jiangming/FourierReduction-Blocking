@@ -6,6 +6,7 @@ if gen_data == 0
     
 elseif gen_data == 1
     [im, N, Ny, Nx] = util_read_image(image_file_name);
+    global im;
 
     param_sampling.N = N; % number of pixels in the image
     param_sampling.Nox = ox*Nx; % number of pixels in the image
@@ -57,6 +58,8 @@ G = Gw(:, W);
 for k = 1:num_tests
     % cell structure to adapt to the solvers
     if normalize_data
+%         G = spdiags(sqrt(2)/sigma_noise, 0, b_l, b_l) * G;
+%         Gw = spdiags(sqrt(2)/sigma_noise, 0, b_l, b_l) * Gw;
         [y0{k}{1}, ~, y{k}{1}, ~, sigma_noise,~, noise{k}{1}] = util_gen_input_data_noblock(im, G, W, A, input_snr);
     else
         [y0{k}{1}, y{k}{1}, ~, ~, sigma_noise, noise{k}{1}, ~] = util_gen_input_data_noblock(im, G, W, A, input_snr);
@@ -67,7 +70,7 @@ end
 %% For dimensionality reduction
 
 if normalize_data
-    Gw = sqrt(2)/sigma_noise * Gw;      % Whitening G matrix (embed natural weighting in the measurement operator)
+    Gw = sqrt(2)/sigma_noise * Gw;      % Whitening G matrix (embed natural weighting in the measurement operator). In reality, this should be done by natural weighting!
 end
 
 if param_fouRed.enable_estimatethreshold

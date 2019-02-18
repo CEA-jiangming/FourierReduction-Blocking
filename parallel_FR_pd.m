@@ -1,24 +1,24 @@
-% function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma)
+function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio)
 
-visibSize = 10 * 256 * 256;
+visibSize = ratio * 256 * 256;
 input_snr = 40;
 image_file_name = './data/images/M31_256.fits';
 coveragefile = '.data/vis/uv.fits';
 % klargestpercent = 100;  % Percent of image size to keep after dimensionality reduction
 run = 1;
-usingReduction = 0;
+% usingReduction = 0;
 usingReductionPar = 0;
-normalize_data = 1;
-usingPrecondition = 1;
-enable_klargestpercent = 1;
-klargestpercent = 25;
-enable_estimatethreshold = 0;
-gamma = 3;
+% normalize_data = 1;
+% usingPrecondition = 1;
+% enable_klargestpercent = 1;
+% klargestpercent = 25;
+% enable_estimatethreshold = 0;
+% gamma = 3;
 % addpath data
 % addpath data/images
 % addpath lib/
 % addpath fouRed/
-% % addpath src
+% addpath src
 % addpath irt/
 % 
 % try
@@ -97,9 +97,9 @@ use_gridded_data = 0; % flag setting for generating gridded data
 
 % evl params
 
-compute_evl = 1;
+compute_evl = logical(~usingReduction && ~usingPrecondition);
 compute_evl_no_natw = 0;
-compute_evl_precond = 1;
+compute_evl_precond = logical(~usingReduction && usingPrecondition);
 compute_block_op_norm = 0; % flag to compute the operator norm for each block
 
 use_symmetric_fourier_sampling = 0;
@@ -169,7 +169,7 @@ param_sing_block_structure.uniform_partitioning_no = 4;
 
 %% preconditioning
 
-param_precond.gen_uniform_weight_matrix = 0; %set weighting type
+param_precond.gen_uniform_weight_matrix = 1; %set weighting type
 param_precond.uniform_weight_sub_pixels = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,15 +184,16 @@ else
     script_get_input_data;
 end
 
+global im;
 %% PDFB parameter structure sent to the algorithm
 param_pdfb.im = im; % original image, used to compute the SNR
 param_pdfb.verbose = verbosity; % print log or not
 param_pdfb.nu1 = 1; % bound on the norm of the operator Psi
-param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
-param_pdfb.gamma = 1e-3; % convergence parameter L1 (soft th parameter)
+param_pdfb.nu2 = evl_precond; % bound on the norm of the operator A*G
+param_pdfb.gamma = 1e-6; % convergence parameter L1 (soft th parameter)
 param_pdfb.tau = 0.49; % forward descent step size
-param_pdfb.rel_obj = 1e-5; % stopping criterion
-param_pdfb.max_iter = 500; % max number of iterations
+param_pdfb.rel_obj = 1e-4; % stopping criterion
+param_pdfb.max_iter = 300; % max number of iterations
 param_pdfb.lambda0 = 1; % relaxation step for primal update
 param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
 param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
@@ -240,4 +241,4 @@ script_run_all_tests_serial;
 
 tend = toc(tstart);
 fprintf('All algorithms runtime: %ds\n\n', ceil(tend));
-% end
+end
