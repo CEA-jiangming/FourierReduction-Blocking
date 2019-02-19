@@ -3,7 +3,7 @@ addpath data/vis
 addpath lib/
 
 try
-    run('src/irt/setup.m');
+    run('./irt/setup.m');
 catch ME
     error('NUFFT library not found in location src/irt');
 end
@@ -16,6 +16,8 @@ gen_data = 1;
 gen_figures = 1;
 gen_only_average_figures = 0;
 free_memory = 0;
+image_file_name = './data/images/M31_256.fits';
+input_snr = 40;
 
 save_dataset_number = 5; % number of the dataset to write files to
 save_dataset_subnumber = 0; % number of the dataset to write files to
@@ -59,7 +61,7 @@ run_sdmm_bpcon = 0; % flag
 run_fb_nnls = 0; % flag
 
 %% real data generation
-use_real_visibilities = 1;
+use_real_visibilities = 0;
 % visibility_file_name = 'data/vis/WEIGHTED-CYGA-C-6680-64CH';
 visibility_file_name = 'data/vis/';
 
@@ -75,7 +77,7 @@ if use_real_visibilities % force only one test
 end
 
 %% simulated data generation
-use_simulated_data = 0;
+use_simulated_data = 1;
 
 %% various config parameters
 verbosity = 1;
@@ -104,7 +106,8 @@ use_symmetric_fourier_sampling = 0;
 
 l2_ball_definition = 'value';
 stopping_criterion = 'l2-ball-percentage';
-
+visibSize = 100*256*256;
+step_epsilon = sqrt(2*visibSize);
 param_l2_ball.stop_eps_v = step_epsilon; % set epsilon value BEFORE running this script
 param_l2_ball.val_eps_v = 1.0*param_l2_ball.stop_eps_v;
 
@@ -161,7 +164,7 @@ script_get_input_data;
 thresholdholographic = 1; diagthresholdepsilon = 1e-10;
 
 % Flag to load from a previously saved covariance matrix file
-covmatfileexists = 1;       % Read precomputed matrix 
+covmatfileexists = 0;       % Read precomputed matrix 
 covmatfile = 'data/savedfiles/covariancemat_vla_c_cyga_hyperspectral_freq6-5-51_i256.rsing.mat';
 
 % Flag to set if we want to approximate D with an
@@ -170,7 +173,7 @@ covmatfile = 'data/savedfiles/covariancemat_vla_c_cyga_hyperspectral_freq6-5-51_
 identityapprox = 0;
 
 % Percent of image size to keep after dimensionality reduction
-klargestpercent = 100;
+klargestpercent = 2;
 
 % Compute holographic matrix
 h = Gw'*Gw;
@@ -188,13 +191,21 @@ if covmatfileexists
     load(covmatfile);
 else
     tstartcovmat = tic;
-    covariancemat = guessmatrix(diagonly, covoperator, Ny*Nx, Ny*Nx);
+    
+    dirac2D = zeros(Ny, Nx);
+    dirac2D(ceil((Ny+1)/2), ceil((Nx+1)/2)) = 1;
+
+    PSF = reshape(grid2img_fwd(dirac2D), Ny, Nx);
+    covariancemat = fftshift(fft2(ifftshift(PSF)));
+    
+%     covariancemat = guessmatrix(diagonly, covoperator, Ny*Nx, Ny*Nx);
     fprintf('\nSaving covariance matrix...\n');
     save(covmatfile, 'covariancemat');
     tendcovmat = toc(tstartcovmat);
     fprintf('Time to compute covariance matrix: %e s\n', tendcovmat)
 end
-d = diag(covariancemat); %*(sigma_noise^2)
+d = abs(covariancemat(:));
+% d = diag(covariancemat); %*(sigma_noise^2)
 d = abs(d);
 % d = ones(size(d)); % Disable weighting, simply do FPhi^TPhiF^T. Throw away the diagonal of covariancemat
 fprintf('\nPruning covariancemat according to eigenvalues (diagonal elements)...');
@@ -231,7 +242,7 @@ param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
 param_pdfb.gamma = 1e-5; % convergence parameter L1 (soft th parameter)
 param_pdfb.tau = 0.49; % forward descent step size
 param_pdfb.rel_obj = 1e-5; % stopping criterion
-param_pdfb.max_iter = 10000; % max number of iterations
+param_pdfb.max_iter = 50; % max number of iterations
 param_pdfb.lambda0 = 1; % relaxation step for primal update
 param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
 param_pdfb.lambda2 = 1; % relaxation step for L2 dual update

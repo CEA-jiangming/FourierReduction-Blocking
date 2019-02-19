@@ -1,9 +1,11 @@
 % This file is to compare gridded operator and complete operator
-% The gridded operator case:
-% F \Phi^T y = \Sigma^2 F x + F \Phi^T n
 %
 % The complete operator case:
 % \Sigma^-1 F \Phi^T y = \Sigma^-1 F \Phi^T \Phi x + \Sigma^-1 F \Phi^T n
+%
+% The gridded operator case:
+% F \Phi^T y = \Sigma^2 F x + F \Phi^T n
+%
 
 close all
 clear variables
@@ -26,6 +28,9 @@ rng('shuffle');
 
 normalize_data = 0;
 usingPrecondition = 0;
+input_snr = 40;
+num_tests = 1;
+verbosity = 1;
 
 serialise = @(x) x(:);
 
@@ -39,15 +44,13 @@ oy = 2; % oversampling factors for nufft
 Kx = 8; % number of neighbours for nufft
 Ky = 8; % number of neighbours for nufft
 
-sampling_pattern = 'gaussian';
-
+visibSize = 2*Nx*Ny;
+param_sampling.N = N; % number of pixels in the image
+param_sampling.Nox = ox*Nx; % number of pixels in the image
+param_sampling.Noy = oy*Ny; % number of pixels in the image
 util_gen_sampling_pattern_config; % Set all parameters
-sparam.N = N; % number of pixels in the image
-sparam.Nox = ox*Nx; % number of pixels in the image
-sparam.Noy = oy*Ny; % number of pixels in the image
-sparam.p = 5;
 
-[~, ~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, sparam);
+[~, ~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
 uw = [uw; -uw];
 vw = [vw; -vw];
 
@@ -70,6 +73,8 @@ G = Gw(:, W);
 % end
 
 %% sparsity operator definition
+wlt_basis = {'db1', 'db2', 'db3', 'db4', 'db5', 'db6', 'db7', 'db8', 'self'}; % wavelet basis to be used
+nlevel = 4; % wavelet level
 
 [Psi, Psit] = op_p_sp_wlt_basis(wlt_basis, nlevel, Ny, Nx);
 [Psiw, Psitw] = op_sp_wlt_basis(wlt_basis, nlevel, Ny, Nx);
@@ -84,6 +89,28 @@ for k = 1:num_tests
         [y0{k}{1}, y{k}{1}, ~, ~, sigma_noise, noise{k}{1}, ~] = util_gen_input_data_noblock(im, G, W, A, input_snr);
     end        
 end
+
+%% definition for the stopping criterion
+% options:
+% l2_ball_definition -> 'sigma', 'chi-percentile', 'value'
+% stopping_criterion -> 'sigma', 'chi-percentile', 'l2-ball-percentage', 'value'
+
+l2_ball_definition = 'sigma';
+stopping_criterion = 'sigma';
+
+param_l2_ball.stop_eps_v = sqrt(2*visibSize); % set epsilon value BEFORE running this script
+param_l2_ball.val_eps_v = 1.0*param_l2_ball.stop_eps_v;
+
+param_l2_ball.sigma_ball = 2;
+param_l2_ball.sigma_stop = 2;
+
+param_l2_ball.chi_percentile_ball = 0.99;
+param_l2_ball.chi_percentile_stop = 0.999;
+
+param_l2_ball.l2_ball_percentage_stop = 1.0001;
+
+use_same_stop_criterion = 1; % forces the distributed criterion to be scaled
+                             % such that same norm is imposed as in the nondistributed setup
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% For dimensionality reduction
@@ -120,20 +147,7 @@ for k = 1:num_tests
     y_grid = y_grid(:);
     y_grid = y_grid(Mask);
     yTmat = Sigma.*y_grid;
-
-    clear T W; 
-    T = {Sigma};
-    W = {Mask};
     yT{k} = {yTmat};
-    if usingPrecondition
-        aW = {1./T{1}};
-    end
-end
-
-if usingPrecondition
-    evl = op_norm(@(x) sqrt(cell2mat(aW)) .* B(x), @(x) Bt(sqrt(cell2mat(aW)) .* x), [Ny, Nx], 1e-6, 200, verbosity);
-else
-    evl = op_norm(B, Bt, [Ny, Nx], 1e-4, 200, verbosity); 
 end
 
 %Bound for the L2 norm
@@ -145,12 +159,9 @@ for k = 1:num_tests
     % Apply F Phi
     n_grid = fftshift(fft2(ifftshift(At(Gw'*noise{k}{1}))));
     n_grid = n_grid(:);
-    
-    % factorized by singular values and compute l2 ball       
-    for i = 1:length(T)
-        epsilonT{k}{i} = norm(T{i} .* n_grid(W{i}));
-        epsilonTs{k}{i} = 1.001*epsilonT{1}{i};
-    end
+    n_grid = n_grid(Mask);
+    epsilonT{k}{1} = norm(Sigma .* n_grid);
+    epsilonTs{k}{1} = 1.001*epsilonT{1}{1};
     epsilon{k} = norm(cell2mat(epsilonT{k}));
     epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
 end
@@ -160,16 +171,23 @@ fprintf('Done\n');
 tend1=toc(tstart1);
 fprintf('Time: %e\n', tend1);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Case 1: Complete operator %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% T = {Sigma};
+% W = {Mask};
+% 
+% evl = op_norm(B, Bt, [Ny, Nx], 1e-4, 200, verbosity);
 
 %% PDFB parameter structure sent to the algorithm
 param_pdfb.im = im; % original image, used to compute the SNR
 param_pdfb.verbose = verbosity; % print log or not
 param_pdfb.nu1 = 1; % bound on the norm of the operator Psi
-param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
+% param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
 param_pdfb.gamma = 1e-6; % convergence parameter L1 (soft th parameter)
 param_pdfb.tau = 0.49; % forward descent step size
 param_pdfb.rel_obj = 1e-4; % stopping criterion
-param_pdfb.max_iter = 300; % max number of iterations
+param_pdfb.max_iter = 500; % max number of iterations
 param_pdfb.lambda0 = 1; % relaxation step for primal update
 param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
 param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
@@ -206,17 +224,6 @@ param_pdfb.hard_thres = 0;
 param_pdfb.adapt_bound_tol =1e-3;
 param_pdfb.adapt_bound_start = 1000;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%% Case 1: Gidded operator %%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-oper_grid = @(x) Sigma.^2 .* serialise(fftshift(fft2(ifftshift(x))));
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%% Case 2: Complete operator %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 result_st = [];
 result_st.sol = cell(num_tests, 1);
 result_st.L1_v = cell(num_tests, 1);
@@ -236,6 +243,72 @@ result_st.no_itr = cell(num_tests, 1);
 result_st.singkept = cell(num_tests, 1);
 
 
+% for i = 1:num_tests
+%     % wavelet mode is a global variable which does not get transfered
+%     % to the workes; we need to set it manually for each worker
+%     dwtmode('per');
+% 
+%     fprintf('Test run %i:\n', i);
+% 
+%     tstart_a = tic;
+%     fprintf(' Running pdfb_bpcon_par_sim_rescaled\n');
+%     [result_st.sol{i}, result_st.L1_v{i}, result_st.L1_vp{i}, result_st.L2_v{i}, ...
+%         result_st.L2_vp{i}, result_st.delta_v{i}, result_st.sol_v{i}, result_st.snr_v{i}, ~, ~, result_st.sol_reweight_v{i}] ...
+%         = pdfb_bpcon_par_sing_sim_rescaled_adapt_eps(yT{i}, [Ny, Nx], epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, C, Ct, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
+%     tend = toc(tstart_a);
+%     fprintf(' pdfb_bpcon_par_sing_sim_rescaled runtime: %ds\n\n', ceil(tend));
+% 
+%     result_st.time{i} = tend;
+% 
+%     result_st.singkept{i} = sum(W{i})/numel(W{i});
+% 
+%     error = im - result_st.sol{i};
+%     result_st.snr{i} = 20 * log10(norm(im(:))/norm(error(:)));
+%   
+%     result_st.no_itr{i} = length(result_st.L1_v{i});
+% 
+%     wcoef = [];
+%     for q = 1:length(Psit)
+%         wcoef = [wcoef; Psit{q}(result_st.sol{i})];
+%     end
+%     result_st.sparsity{i} = sum(abs(wcoef) > 1e-3)/length(wcoef);
+% end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% Case 2: Gidded operator %%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+clear T W;
+% Fx =@(x) serialise(fftshift(fft2(ifftshift(reshape(x, Ny, Nx)))));
+% Fxt =@(x) fftshift(fft2(ifftshift(reshape(x, Ny, Nx))));
+% T1 = {1./Sigma};
+D = @(x) oper_grid(x, 1./Sigma, Mask, [Ny, Nx]);
+Dt = @(x) oper_grid_adjoint(x, 1./Sigma, Mask, [Ny, Nx]);
+evl1 = op_norm(D, Dt, [Ny, Nx], 1e-4, 200, verbosity);
+% evl = max(1./Sigma)^2; 
+
+T = mat2cell([1], 1);
+W = mat2cell(true(size(yTmat)), length(yTmat));
+
+param_pdfb.nu2 = evl1; % bound on the norm of the operator A*G
+param_pdfb.gamma = 1e0; % convergence parameter L1 (soft th parameter)
+
+result_st1 = [];
+result_st1.sol = cell(num_tests, 1);
+result_st1.L1_v = cell(num_tests, 1);
+result_st1.L1_vp = cell(num_tests, 1);
+result_st1.L2_v = cell(num_tests, 1);
+result_st1.L2_vp = cell(num_tests, 1);
+result_st1.time = cell(num_tests, 1);
+result_st1.delta_v = cell(num_tests, 1);
+result_st1.sol_v = cell(num_tests, 1);
+result_st1.sol_reweight_v = cell(num_tests, 1);
+result_st1.snr_v = cell(num_tests, 1);
+
+result_st1.snr = cell(num_tests, 1);
+result_st1.sparsity = cell(num_tests, 1);
+result_st1.no_itr = cell(num_tests, 1);
+
+
 for i = 1:num_tests
     % wavelet mode is a global variable which does not get transfered
     % to the workes; we need to set it manually for each worker
@@ -245,34 +318,39 @@ for i = 1:num_tests
 
     tstart_a = tic;
     fprintf(' Running pdfb_bpcon_par_sim_rescaled\n');
-    [result_st.sol{i}, result_st.L1_v{i}, result_st.L1_vp{i}, result_st.L2_v{i}, ...
-        result_st.L2_vp{i}, result_st.delta_v{i}, result_st.sol_v{i}, result_st.snr_v{i}, ~, ~, result_st.sol_reweight_v{i}] ...
-        = pdfb_bpcon_par_sing_sim_rescaled_adapt_eps(yT{i}, [Ny, Nx], epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, C, Ct, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
+ 
+    [result_st1.sol{i}, result_st1.L1_v{i}, result_st1.L1_vp{i}, result_st1.L2_v{i}, ...
+        result_st1.L2_vp{i}, result_st1.delta_v{i}, result_st1.sol_v{i}, result_st1.snr_v{i}, ~, ~, result_st1.sol_reweight_v{i}] ...
+        = pdfb_bpcon_par_sim_rescaled_adapt_eps(yT{i}, epsilonT{i}, epsilonTs{i}, epsilon{i}, epsilons{i}, D, Dt, T, W, Psi, Psit, Psiw, Psitw, param_pdfb);
+
     tend = toc(tstart_a);
-    fprintf(' pdfb_bpcon_par_sing_sim_rescaled runtime: %ds\n\n', ceil(tend));
+    fprintf(' pdfb_bpcon_par_sim_rescaled runtime: %ds\n\n', ceil(tend));
 
-    result_st.time{i} = tend;
-
-    result_st.singkept{i} = sum(W{i})/numel(W{i});
-
-    if ~use_real_visibilities
-        error = im - result_st.sol{i};
-        result_st.snr{i} = 20 * log10(norm(im(:))/norm(error(:)));
-    end
-    result_st.no_itr{i} = length(result_st.L1_v{i});
+    result_st1.time{i} = tend;
+    
+    error = im - result_st1.sol{i};
+    result_st1.snr{i} = 20 * log10(norm(im(:))/norm(error(:)));
+    
+    result_st1.no_itr{i} = length(result_st1.L1_v{i});
 
     wcoef = [];
     for q = 1:length(Psit)
-        wcoef = [wcoef; Psit{q}(result_st.sol{i})];
+        wcoef = [wcoef; Psit{q}(result_st1.sol{i})];
     end
-    result_st.sparsity{i} = sum(abs(wcoef) > 1e-3)/length(wcoef);
+    result_st1.sparsity{i} = sum(abs(wcoef) > 1e-3)/length(wcoef);
 end
 
-results_prefix = 'pdfb_bpcon_par_sim_rescaled';
-param_structure_name = 'param_pdfb';
 
-% results
-script_gen_figures;
 
-% save data
-script_save_result_data;
+
+function y = oper_grid(x, Sigma, Mask, imsize)
+Fx =fftshift(fft2(ifftshift(reshape(x, imsize))));
+Fx = Fx(:);
+y = Sigma.*Fx(Mask);
+end
+
+function y = oper_grid_adjoint(x, Sigma, Mask, imsize)
+Fy = zeros(prod(imsize),1);
+Fy(Mask) = Sigma.* x;
+y = fftshift(ifft2(ifftshift(reshape(Fy, imsize))));
+end
