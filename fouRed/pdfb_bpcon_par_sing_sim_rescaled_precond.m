@@ -45,15 +45,10 @@ function [xsol, L1_v, L1_vp, L2_v, L2_vp, delta_v, sol_v, snr_v, no_sub_itr_v, v
 
 
 % number of nodes
-R = length(y);
+R = length(T);
 P = length(Psit);
 
-% oversampling vectorized data length
-% No = size(W{1}, 1);
-
 % number of pixels
-% N = numel(At(zeros(No, 1)));
-% [Ny, Nx] = size(At(zeros(No, 1)));
 Ny = imsize(1);
 Nx = imsize(2);
 
@@ -255,6 +250,9 @@ sol_reweight_v = zeros(0, Ny, Nx);
 snr_v = zeros(param.max_iter, 1);
 
 %% useful functions for the projection
+% scaling, projection on L2 norm
+sc = @(z, radius) z * min(radius/norm(z(:)), 1);
+
 % thresholding negative values
 hardt = @(z) max(real(z), min(-param.im0, 0));
 % hardt = @(z) max(real(z), 0);
@@ -298,7 +296,7 @@ gamma = param.gamma;
 reweight_alpha = param.reweight_alpha;
 reweight_alpha_ff = param.reweight_alpha_ff;
 
-[proj] = solver_find_elipse_point(y, pU, A, T, xsol, v2, W, epsilont, param.elipse_proj_max_iter, param.elipse_proj_min_iter, param.elipse_proj_eps);
+% [proj] = solver_find_elipse_point(y, pU, A, T, xsol, v2, W, epsilont, param.elipse_proj_max_iter, param.elipse_proj_min_iter, param.elipse_proj_eps);
 
 
 %% main loop: sequential + simulated parallel
@@ -362,15 +360,21 @@ for t = 1:param.max_iter
         r2{q} = T{q} .* ns_p{q};
         
         if param.use_proj_elipse_fb
+            fprintf('Preconditioning step');
+            if t == 1
+                proj{q} = zeros(size(y{q}));
+            end
             [proj{q}, no_sub_itr{q}] = solver_proj_elipse_fb(1 ./ pU{q} .* v2{q}, r2{q}, y{q}, pU{q}, epsilont{q}, proj{q}, param.elipse_proj_max_iter, param.elipse_proj_min_iter, param.elipse_proj_eps);
             vy2{q} = v2{q} + pU{q} .* r2{q} - pU{q} .* proj{q};
+        else
+            vy2{q} = v2{q} + r2{q} - y{q} - sc(v2{q} + r2{q} - y{q}, epsilont{q});
         end
-        if ~param.use_proj_elipse_fb
+%         if ~param.use_proj_elipse_fb
 %             [proj{q}, no_sub_itr{q}] = solver_proj_elipse((sqrt(pU{q}) .* 1./pU{q}) .* (v2{q} + pU{q} .* r2{q}), 1 ./ sqrt(pU{q}), epsilont{q}, proj{q}, y{q}, param.elipse_proj_max_iter, param.elipse_proj_eps);
 %             vy2{q} = v2{q} + pU{q} .* r2{q} - (pU{q} .* 1 ./ sqrt(pU{q})) .* proj{q};
-            [proj{q}, no_sub_itr{q}] = solver_proj_elipse(1 ./ sqrt(pU{q}) .* (v2{q} + pU{q} .* r2{q}), 1 ./ sqrt(pU{q}), epsilont{q}, proj{q}, y{q}, param.elipse_proj_max_iter, param.elipse_proj_min_iter, param.elipse_proj_eps);
-            vy2{q} = v2{q} + pU{q} .* r2{q} - sqrt(pU{q}) .* proj{q};
-        end
+%             [proj{q}, no_sub_itr{q}] = solver_proj_elipse(1 ./ sqrt(pU{q}) .* (v2{q} + pU{q} .* r2{q}), 1 ./ sqrt(pU{q}), epsilont{q}, proj{q}, y{q}, param.elipse_proj_max_iter, param.elipse_proj_min_iter, param.elipse_proj_eps);
+%             vy2{q} = v2{q} + pU{q} .* r2{q} - sqrt(pU{q}) .* proj{q};
+%         end
           
 
         v2{q} = v2{q} + lambda2 * (vy2{q} - v2{q});

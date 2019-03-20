@@ -1,4 +1,4 @@
-function [Ipsf, d12, Mask] = fourierReduction(Gw, A, At, imsize, param)
+function [Ipsf, Mask, d12, FIpsf, FIpsf_t, param] = fourierReduction(Gw, A, At, imsize, param)
 
 % Flags monitoring
 
@@ -15,12 +15,13 @@ elseif param.enable_estimatethreshold
     if ~isfield(param, 'gamma') 
         param.gamma = 3; 
     end
-    if ~isfield(param, 'x2') || ~isfield(param, 'noise')
-        error('Either ||x||_2 or noise is missing for the estimation of the threshold');
+    if ~isfield(param, 'x2') && ~isfield(param, 'sigma_noise')
+        error('Either ||x||_2 or sigma_noise is missing for the estimation of the threshold');
     end
-    noise = param.noise;
+    sigma_noise = param.sigma_noise;
     gamma = param.gamma;
     x2 = param.x2;
+    dirty2 = param.dirty2;
 end
 
 % Flag to pull up the values of elements of the holographic matrix
@@ -56,11 +57,14 @@ H = Gw'*Gw;
 % Create the new measurement operator
 serialise = @(x) x(:);
 
-Ipsf = @(x) At(H*A(reshape(x, Ny, Nx)));  % Phi^T Phi = At G' G A = At H A: vect -> vect
+Ipsf = @(x) real(At(H*A(reshape(x, Ny, Nx))));  % Phi^T Phi = At G' G A = At H A: image -> image
 
 fprintf('\nComputing covariance matrix...');
 % Covariance operator F Phi^T Phi F^T = F At H A F^T = F Ipsf F^T
-covoperator = @(x) serialise(fftshift(fft2(ifftshift(Ipsf(fftshift(ifft2(ifftshift(reshape(full(x), Ny, Nx)))))))));
+FT2 = @(x) fftshift(fft2(ifftshift(x)));
+IFT2 = @(x) fftshift(ifft2(ifftshift(x)));
+
+covoperator = @(x) serialise(FT2(Ipsf(real(IFT2(reshape(x, Ny, Nx))))));
 diagonly = 1; % Only compute diagonal of covariance matrix FPhi^TPhiF^T
 if covmatfileexists
     fprintf('\nLoading covariance matrix from file...');
@@ -71,8 +75,8 @@ else
         dirac2D = zeros(Ny, Nx);
         dirac2D(ceil((Ny+1)/2), ceil((Nx+1)/2)) = 1;
 
-        PSF = reshape(Ipsf(dirac2D), Ny, Nx);
-        covariancemat = fftshift(fft2(ifftshift(PSF)));
+        PSF = Ipsf(dirac2D);
+        covariancemat = FT2(PSF);
     else
         covariancemat = guessmatrix(diagonly, covoperator, Ny*Nx, Ny*Nx);
     end
@@ -83,10 +87,12 @@ else
 end
 
 if fastCov
-    d = abs(covariancemat(:));
+%     d = abs(covariancemat(:));
+    d = real(covariancemat(:));
 else
     d = diag(covariancemat); %*(sigma_noise^2)
-    d = abs(d);
+%     d = abs(d);
+    d = real(d);
 end
 
 % Singular values thresholding
@@ -95,9 +101,17 @@ if param.enable_klargestpercent
     Mask = (d >= prctile(d,100-klargestpercent));
 elseif param.enable_estimatethreshold
     % Embed the noise
-    rn = fftshift(fft2(ifftshift(At(Gw'*noise))));  % Apply F Phi
+    noise = sigma_noise/sqrt(2) * (randn(size(Gw, 1),1) + 1j * randn(size(Gw, 1), 1));
+    rn = FT2(At(Gw'*noise));  % Apply F Phi
     th = gamma * std(rn(:)) / x2;
-    Mask = (d >= th);
+%     th_dirty = gamma * std(rn(:)) / dirty2;
+%     param.maxd = max(d);
+%     param.th = th;
+%     param.th_dirty = th_dirty;
+%     param.singInit = d;
+    fprintf('\nThe estimate threshold using ground truth is %e \n', th);
+%     fprintf('\nThe estimate threshold using dirty image is %e \n', th_dirty);
+    Mask = (d >= th_dirty);
 end
 d = d(Mask);
 fprintf('\nThe threshold is %e \n', min(d));
@@ -105,4 +119,9 @@ fprintf('\nThe threshold is %e \n', min(d));
 d = max(diagthresholdepsilon, d);  % This ensures that inverting the values will not explode in computation
 d12 = 1./sqrt(d);
 
+FIpsf = @(x) serialise(FT2(Ipsf(x)));  % F * Ipsf, image -> vect
+FIpsf_t = @(x) Ipsf(IFT2(reshape(full(x), imsize)));  % Ipsf * F^T, vect -> image
+
 end
+
+

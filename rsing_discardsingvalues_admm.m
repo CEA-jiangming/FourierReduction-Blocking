@@ -45,7 +45,7 @@ end
 % Filenames to save the solution, text output and relevant variables
 solfile=sprintf('results/%s/discarding/soln.rsing.i%d.p%02d.r%02d.mat', subdirname, Ny, ceil(visibSize/(N)), run);
 logfile=sprintf('logs/%s/discarding/soln.rsing.i%d.p%02d.r%02d.log', subdirname, Ny, ceil(visibSize/(N)), run);
-diary(logfile);
+% diary(logfile);
 
 % Flag to set if we want to approximate G^TG with a
 % diagonal matrix. Reset the flag to use the normal H=G^TG.
@@ -186,13 +186,21 @@ else
         covoperator = @(x) serialise( A( ifft2( reshape(full(x), Ny, Nx) ) ) ); % This is the covariance matrix F*Phi^T*Phi*F^T
         %    covoperator = @(x) grid2imgsize_fwd(reshape(full(x), Ny, Nx), st, ht, Mask); % This is used to compute and plot the full covariance
         %    matrix Phi^T*Phi (when R = Phi^T), to show that it is less diagonally dominated then F*Phi^T*Phi*F^T.
-        covariancemat = guessmatrix(diagonly, covoperator, M, M);
+        
+        dirac2D = zeros(Ny, Nx);
+        dirac2D(ceil((Ny+1)/2), ceil((Nx+1)/2)) = 1;
+
+        PSF = reshape(grid2imgsize_fwd(dirac2D, st, ht, Mask), Ny, Nx);
+        covariancemat = fftshift(fft2(ifftshift(PSF)));
+        
+%         covariancemat = guessmatrix(diagonly, covoperator, M, M);
         covariancemat = abs(covariancemat);
     else
         fprintf('\nLoading (diagonal of) covariancemat from saved file...');
         load(covmatfile);
     end
-    d = diag(covariancemat); %*(sigma_noise^2)
+%     d = diag(covariancemat); %*(sigma_noise^2)
+    d = covariancemat(:);
     fprintf('\nPruning covariancemat according to eigenvalues (diagonal elements)...');
     nonzerocols = find(d >= prctile(d,100-klargestpercent));
     d = d(nonzerocols);
@@ -231,7 +239,7 @@ if(cheatepsilon)
 else
     %%% compute epsilon from histogram to match with the
     %%% analytically computed epsilon above
-    numexamples = 100;
+    numexamples = 10;
     visibsize = size(st.p, 1); % The size of the original data (and noise) vector
     d12rnnorms = zeros(numexamples, 1);
     for i=1:numexamples
@@ -260,9 +268,9 @@ tend1=toc(tstart1);
 fprintf('Time: %e\n', tend1);
 
 %Maximum eigenvalue of operator A^TA
-eval = pow_method(A, At, [Ny,Nx], 1e-3, 100, 1);
+eval = op_norm(A, At, [Ny,Nx], 1e-3, 100, 1);
 Phi = @(x) nufft(x, st); Phit = @(x) nufft_adj(x, st);
-evalPhi = pow_method(Phi, Phit, [Ny,Nx], 1e-3, 100, 1) % This is needed to compute the DR
+evalPhi = op_norm(Phi, Phit, [Ny,Nx], 1e-3, 100, 1) % This is needed to compute the DR
 
 %Dirty image
 fprintf('Computing dirty image... ');
@@ -319,7 +327,7 @@ fprintf('Running solver...\n');
 param1.verbose = 1; % Print log or not
 param1.gamma = 1e-6; % Converge parameter
 param1.rel_obj = 1e-4; % Stopping criterion for the L1 problem
-param1.max_iter = 100000; % Max. number of iterations for the L1 problem
+param1.max_iter = 20; % Max. number of iterations for the L1 problem
 param1.nu = eval; % Bound on the norm of the operator A
 param1.tight_L1 = 0; % Indicate if Psit is a tight frame (1) or not (0)
 param1.max_iter_L1 = 100;
@@ -327,7 +335,8 @@ param1.rel_obj_L1 = 1e-2;
 param1.pos_L1 = 1;
 param1.nu_L1 = 1;
 param1.verbose_L1 = 0; % Print log or not
-     
+    
+% profile('on')
 %Solve BPDN
 tstart = tic;
 %sol = pdfb_bpcon(y, epsilon, A, At, Psi, Psit, param1);

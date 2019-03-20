@@ -1,7 +1,7 @@
-function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio)
+function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr)
 
 visibSize = ratio * 256 * 256;
-input_snr = 40;
+input_snr = input_snr;
 image_file_name = './data/images/M31_256.fits';
 coveragefile = '.data/vis/uv.fits';
 % klargestpercent = 100;  % Percent of image size to keep after dimensionality reduction
@@ -49,10 +49,10 @@ num_tests = 1;
 num_workers = 1; % number of tests to run in parallel; should be less than
                  % the number of cores and is limited by the system memory for the variables
 
-run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReduction && ~usingPrecondition);
+% run_pdfb_bpcon_par_sing_sim_rescaled = logical(usingReduction && ~usingPrecondition);
 run_pdfb_bpcon_par_sim_rescaled = logical(~usingReduction && ~usingPrecondition); % flag  
 run_pdfb_bpcon_par_sim_rescaled_natw = 0; % flag
-run_pdfb_bpcon_par_sing_sim_rescaled_precond = logical(usingReduction && usingPrecondition); % flag
+run_pdfb_bpcon_par_sing_sim_rescaled_precond = logical(usingReduction); % logical(usingReduction && usingPrecondition); % flag
 run_pdfb_bpcon_par_sim_rescaled_precond = logical(~usingReduction && usingPrecondition); % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par_gs = 0; % flag
@@ -184,22 +184,22 @@ else
     script_get_input_data;
 end
 
-global im;
+% global im;
 %% PDFB parameter structure sent to the algorithm
 param_pdfb.im = im; % original image, used to compute the SNR
 param_pdfb.verbose = verbosity; % print log or not
 param_pdfb.nu1 = 1; % bound on the norm of the operator Psi
-param_pdfb.nu2 = evl_precond; % bound on the norm of the operator A*G
+param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
 param_pdfb.gamma = 1e-6; % convergence parameter L1 (soft th parameter)
 param_pdfb.tau = 0.49; % forward descent step size
 param_pdfb.rel_obj = 1e-4; % stopping criterion
-param_pdfb.max_iter = 300; % max number of iterations
+param_pdfb.max_iter = 50; % max number of iterations
 param_pdfb.lambda0 = 1; % relaxation step for primal update
 param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
 param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
 param_pdfb.sol_steps = [inf]; % saves images at the given iterations
 
-param_pdfb.use_proj_elipse_fb = 1;
+param_pdfb.use_proj_elipse_fb = logical(usingPrecondition);
 param_pdfb.elipse_proj_max_iter = 200;
 param_pdfb.elipse_proj_min_iter = 1;
 param_pdfb.elipse_proj_eps = 1e-8; % precision of the projection onto the ellipsoid

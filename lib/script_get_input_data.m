@@ -320,7 +320,7 @@ if gen_data == 1
         param_sampling.Noy = oy*Ny; % number of pixels in the image
         util_gen_sampling_pattern_config; % Set all parameters
         
-        [uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
+        [~,~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
 
         
         if use_symmetric_fourier_sampling

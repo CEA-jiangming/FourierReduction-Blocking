@@ -44,7 +44,7 @@ oy = 2; % oversampling factors for nufft
 Kx = 8; % number of neighbours for nufft
 Ky = 8; % number of neighbours for nufft
 
-visibSize = 2*Nx*Ny;
+visibSize = 100*Nx*Ny;
 param_sampling.N = N; % number of pixels in the image
 param_sampling.Nox = ox*Nx; % number of pixels in the image
 param_sampling.Noy = oy*Ny; % number of pixels in the image
@@ -117,7 +117,7 @@ use_same_stop_criterion = 1; % forces the distributed criterion to be scaled
 
 % Fourier reduction parameters
 param_fouRed.enable_klargestpercent = 1;
-param_fouRed.klargestpercent = 25;
+param_fouRed.klargestpercent = 2;
 param_fouRed.enable_estimatethreshold = 0;
 param_fouRed.gamma = 3;             % By using threshold estimation, the optimal theshold reads as gamma * sigma / ||x||_2
 param_fouRed.diagthresholdepsilon = 1e-10; 

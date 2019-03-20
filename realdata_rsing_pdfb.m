@@ -31,8 +31,10 @@ num_workers = 1; % number of tests to run in parallel; should be less than
                  % the number of cores and is limited by the system memory for the variables
 
 run_pdfb_bpcon_par_sim_rescaled = 1; % flag
+run_pdfb_bpcon_par_sing_sim_rescaled = 0;
 run_pdfb_bpcon_par_sim_rescaled_natw = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond = 0; % flag
+run_pdfb_bpcon_par_sing_sim_rescaled_precond = 0;
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par_gs = 0; % flag
 run_pdfb_bpcon_par_sim_rescaled_precond_wave_par_var_block_eps = 0; % flag
@@ -242,7 +244,7 @@ param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
 param_pdfb.gamma = 1e-5; % convergence parameter L1 (soft th parameter)
 param_pdfb.tau = 0.49; % forward descent step size
 param_pdfb.rel_obj = 1e-5; % stopping criterion
-param_pdfb.max_iter = 50; % max number of iterations
+param_pdfb.max_iter = 20; % max number of iterations
 param_pdfb.lambda0 = 1; % relaxation step for primal update
 param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
 param_pdfb.lambda2 = 1; % relaxation step for L2 dual update

@@ -30,7 +30,7 @@ function [xsol, L1_v, L1_vp, L2_v, L2_vp, delta_v, sol_v, snr_v, v1, v2, sol_rew
 % E-mail: a.onose@hw.ac.uk, rafael.carrillo@epfl.ch
 
 % number of nodes
-R = length(y);
+R = length(T);
 P = length(Psit);
 
 Ny = imsize(1);
@@ -49,7 +49,7 @@ else
 end
 % if ~isfield(param, 'nu2')
 %     param.nu2 = zeros(R, 1);
-%     % maximum eigenvalue of operato A^T A
+%     maximum eigenvalue of operato A^T A
 %     for q = 1:R
 %         Tw = spalloc(size(T{q}, 1), No, size(T{q}, 2) * 16);
 %         Tw(:, W{q}) = T{q};
