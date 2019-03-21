@@ -1,8 +1,8 @@
 function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr)
 
-visibSize = ratio * 256 * 256;
+visibSize = ratio * 64 * 64;
 input_snr = input_snr;
-image_file_name = './data/images/M31_256.fits';
+image_file_name = './data/images/M31_64.fits';
 coveragefile = '.data/vis/uv.fits';
 % klargestpercent = 100;  % Percent of image size to keep after dimensionality reduction
 run = 1;

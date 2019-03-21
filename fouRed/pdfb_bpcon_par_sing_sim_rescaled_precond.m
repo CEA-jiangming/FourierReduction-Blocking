@@ -86,7 +86,7 @@ if ~isfield(param, 'tau'), param.tau = 0.49; end
 if ~isfield(param, 'weights')
     param.weights = cell(P, 1);
     for k = 1:P
-        param.weights{k} = ones(size(Psit{k}(At(zeros(size(W{1}, 1), 1))), 1), 1);
+        param.weights{k} = ones(Nx * Ny, 1);
     end
 else
     if ~iscell(param.weights)

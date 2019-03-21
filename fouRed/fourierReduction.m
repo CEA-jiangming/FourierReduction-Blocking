@@ -1,4 +1,4 @@
-function [Ipsf, Mask, d12, FIpsf, FIpsf_t, param] = fourierReduction(Gw, A, At, imsize, param)
+function [Ipsf, Mask, d12, FIpsf, FIpsf_t] = fourierReduction(Gw, A, At, imsize, W, param)
 
 % Flags monitoring
 
@@ -53,11 +53,10 @@ Ny = imsize(1);
 Nx = imsize(2);
 % Compute holographic matrix
 H = Gw'*Gw;
+% Create the PSF operator
+Ipsf = @(x) operatorIpsf(x, A, At, H, [Ny, Nx], W);     % Phi^T Phi = At G' G A = At H A: image -> image
 
-% Create the new measurement operator
 serialise = @(x) x(:);
-
-Ipsf = @(x) real(At(H*A(reshape(x, Ny, Nx))));  % Phi^T Phi = At G' G A = At H A: image -> image
 
 fprintf('\nComputing covariance matrix...');
 % Covariance operator F Phi^T Phi F^T = F At H A F^T = F Ipsf F^T
@@ -124,4 +123,21 @@ FIpsf_t = @(x) Ipsf(IFT2(reshape(full(x), imsize)));  % Ipsf * F^T, vect -> imag
 
 end
 
+function y = operatorIpsf(x, A, At, H, No, W)
+Ny = No(1);
+Nx = No(2);
 
+x1 = A(x);
+if exist('W', 'var') && exist('No', 'var')
+    x1 = x1(W);
+end
+x2 = H * x1;
+if exist('W', 'var') && exist('No', 'var')
+    x3 = zeros(Ny * Nx, 1);
+    x3(W) = x2;
+    x2 = x3;
+end
+y = real(At(x2));
+end
+
+    
