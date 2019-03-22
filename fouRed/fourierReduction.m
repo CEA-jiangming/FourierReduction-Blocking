@@ -87,11 +87,11 @@ end
 
 if fastCov
 %     d = abs(covariancemat(:));
-    d = real(covariancemat(:));
+    d = abs(real(covariancemat(:)));
 else
     d = diag(covariancemat); %*(sigma_noise^2)
 %     d = abs(d);
-    d = real(d);
+    d = abs(real(d));
 end
 
 % Singular values thresholding
@@ -127,7 +127,7 @@ function y = operatorIpsf(x, A, At, H, No, W)
 Ny = No(1);
 Nx = No(2);
 
-x1 = A(x);
+x1 = A(real(x));
 if exist('W', 'var') && exist('No', 'var')
     x1 = x1(W);
 end

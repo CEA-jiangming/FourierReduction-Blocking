@@ -27,7 +27,7 @@ elseif param.use_sort_uniform_partitioning
     step = floor(nb_sing/param.uniform_partitioning_no);  
     beg_ind = 1;                                     % Beginning index
     mask_ind = find(mask);                           % Index vector of singular values
-    [Sigma_sort, ind_sort] = sort(Sigma);
+    [Sigma_sort, ind_sort] = sort(abs(Sigma));
     mask_ind_sort = mask_ind(ind_sort);
     x_sort = x(ind_sort);
     ns_sort = ns(ind_sort);
