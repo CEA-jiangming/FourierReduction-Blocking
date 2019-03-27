@@ -18,5 +18,5 @@ param_sampling.fpartition = [pi]; % partition (symetrically) of the data to node
 % param_sampling.fpartition = [-0.25*pi, 0, 0.25*pi, pi]; % partition (symetrically) of the data to nodes (frequency ranges)
 % param_sampling.fpartition = [-0.3*pi, -0.15*pi, 0, 0.15*pi, 0.3*pi, pi]; % partition (symetrically) of the data to nodes (frequency ranges)
 % param_sampling.fpartition = [-0.35*pi, -0.25*pi, -0.15*pi, 0, 0.15*pi, 0.25*pi, 0.35*pi, pi]; % partition (symetrically) of the data to nodes (frequency ranges)
-param_sampling.sigma = pi/4; % variance of the gaussion over continous frequency
+% param_sampling.sigma = pi/4; % variance of the gaussion over continous frequency
 param_sampling.sigma_holes = pi/3; % variance of the gaussion for the holes

@@ -1,8 +1,8 @@
-function [result_st] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr)
+function [param_fouRed] = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr, sigma_gaussian)
 
-visibSize = ratio * 64 * 64;
+visibSize = ratio * 128 * 128;
 input_snr = input_snr;
-image_file_name = './data/images/M31_64.fits';
+image_file_name = './data/images/cluster_128.fits';
 coveragefile = '.data/vis/uv.fits';
 % klargestpercent = 100;  % Percent of image size to keep after dimensionality reduction
 run = 1;
@@ -185,60 +185,60 @@ else
 end
 
 % global im;
-%% PDFB parameter structure sent to the algorithm
-param_pdfb.im = im; % original image, used to compute the SNR
-param_pdfb.verbose = verbosity; % print log or not
-param_pdfb.nu1 = 1; % bound on the norm of the operator Psi
-param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
-param_pdfb.gamma = 1e-6; % convergence parameter L1 (soft th parameter)
-param_pdfb.tau = 0.49; % forward descent step size
-param_pdfb.rel_obj = 1e-4; % stopping criterion
-param_pdfb.max_iter = 50; % max number of iterations
-param_pdfb.lambda0 = 1; % relaxation step for primal update
-param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
-param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
-param_pdfb.sol_steps = [inf]; % saves images at the given iterations
-
-param_pdfb.use_proj_elipse_fb = logical(usingPrecondition);
-param_pdfb.elipse_proj_max_iter = 200;
-param_pdfb.elipse_proj_min_iter = 1;
-param_pdfb.elipse_proj_eps = 1e-8; % precision of the projection onto the ellipsoid
-
-param_pdfb.use_reweight_steps = 4;
-param_pdfb.use_reweight_eps = 0;
-param_pdfb.reweight_steps = [600:50:10000 inf];
-param_pdfb.reweight_rel_obj = 1e-5; % criterion for performing reweighting
-param_pdfb.reweight_min_steps_rel_obj = 50;
-param_pdfb.reweight_alpha = 1; % Alpha always 1
-param_pdfb.reweight_alpha_ff = 0.75; % 0.25 Too agressively reduces the weights, try 0.7, 0.8
-param_pdfb.reweight_abs_of_max = inf;
-param_pdfb.total_reweights = 20;
-
-param_pdfb.use_best_bound_steps = 0;
-param_pdfb.use_best_bound_eps = 0;
-param_pdfb.best_bound_reweight_steps = 0;
-param_pdfb.best_bound_steps = [inf];
-param_pdfb.best_bound_rel_obj = 1e-6;
-param_pdfb.best_bound_alpha = 1.0001; % stop criterion over eps bound
-param_pdfb.best_bound_alpha_ff = 0.998;
-param_pdfb.best_bound_stop_eps_v = 1.001*param_l2_ball.stop_eps_v; % the method stops if the eps bound goes below this
-
-param_pdfb.use_adapt_bound_eps = 0;
-param_pdfb.adapt_bound_steps = 100;
-param_pdfb.adapt_bound_rel_obj = 1e-5;
-param_pdfb.hard_thres = 0;
-param_pdfb.adapt_bound_tol =1e-3;
-param_pdfb.adapt_bound_start = 1000;
-
-param_pdfb.savepath = save_path;
-
-
-%% compute the solution
-fprintf('Starting algorithms:\n\n');
-tstart = tic;
-
-script_run_all_tests_serial;
-
-tend = toc(tstart);
-fprintf('All algorithms runtime: %ds\n\n', ceil(tend));
+% %% PDFB parameter structure sent to the algorithm
+% param_pdfb.im = im; % original image, used to compute the SNR
+% param_pdfb.verbose = verbosity; % print log or not
+% param_pdfb.nu1 = 1; % bound on the norm of the operator Psi
+% param_pdfb.nu2 = evl; % bound on the norm of the operator A*G
+% param_pdfb.gamma = 1e-6; % convergence parameter L1 (soft th parameter)
+% param_pdfb.tau = 0.49; % forward descent step size
+% param_pdfb.rel_obj = 1e-4; % stopping criterion
+% param_pdfb.max_iter = 50; % max number of iterations
+% param_pdfb.lambda0 = 1; % relaxation step for primal update
+% param_pdfb.lambda1 = 1; % relaxation step for L1 dual update
+% param_pdfb.lambda2 = 1; % relaxation step for L2 dual update
+% param_pdfb.sol_steps = [inf]; % saves images at the given iterations
+% 
+% param_pdfb.use_proj_elipse_fb = logical(usingPrecondition);
+% param_pdfb.elipse_proj_max_iter = 200;
+% param_pdfb.elipse_proj_min_iter = 1;
+% param_pdfb.elipse_proj_eps = 1e-8; % precision of the projection onto the ellipsoid
+% 
+% param_pdfb.use_reweight_steps = 4;
+% param_pdfb.use_reweight_eps = 0;
+% param_pdfb.reweight_steps = [600:50:10000 inf];
+% param_pdfb.reweight_rel_obj = 1e-5; % criterion for performing reweighting
+% param_pdfb.reweight_min_steps_rel_obj = 50;
+% param_pdfb.reweight_alpha = 1; % Alpha always 1
+% param_pdfb.reweight_alpha_ff = 0.75; % 0.25 Too agressively reduces the weights, try 0.7, 0.8
+% param_pdfb.reweight_abs_of_max = inf;
+% param_pdfb.total_reweights = 20;
+% 
+% param_pdfb.use_best_bound_steps = 0;
+% param_pdfb.use_best_bound_eps = 0;
+% param_pdfb.best_bound_reweight_steps = 0;
+% param_pdfb.best_bound_steps = [inf];
+% param_pdfb.best_bound_rel_obj = 1e-6;
+% param_pdfb.best_bound_alpha = 1.0001; % stop criterion over eps bound
+% param_pdfb.best_bound_alpha_ff = 0.998;
+% param_pdfb.best_bound_stop_eps_v = 1.001*param_l2_ball.stop_eps_v; % the method stops if the eps bound goes below this
+% 
+% param_pdfb.use_adapt_bound_eps = 0;
+% param_pdfb.adapt_bound_steps = 100;
+% param_pdfb.adapt_bound_rel_obj = 1e-5;
+% param_pdfb.hard_thres = 0;
+% param_pdfb.adapt_bound_tol =1e-3;
+% param_pdfb.adapt_bound_start = 1000;
+% 
+% param_pdfb.savepath = save_path;
+% 
+% 
+% %% compute the solution
+% fprintf('Starting algorithms:\n\n');
+% tstart = tic;
+% 
+% script_run_all_tests_serial;
+% 
+% tend = toc(tstart);
+% fprintf('All algorithms runtime: %ds\n\n', ceil(tend));
 end

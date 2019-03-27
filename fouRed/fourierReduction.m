@@ -1,4 +1,4 @@
-function [Ipsf, Mask, d12, FIpsf, FIpsf_t] = fourierReduction(Gw, A, At, imsize, W, param)
+function [Ipsf, Mask, d12, FIpsf, FIpsf_t, param] = fourierReduction(Gw, A, At, imsize, W, param)
 
 % Flags monitoring
 
@@ -101,16 +101,18 @@ if param.enable_klargestpercent
 elseif param.enable_estimatethreshold
     % Embed the noise
     noise = sigma_noise/sqrt(2) * (randn(size(Gw, 1),1) + 1j * randn(size(Gw, 1), 1));
-    rn = FT2(At(Gw'*noise));  % Apply F Phi
-    th = gamma * std(rn(:)) / x2;
+    rn = FT2(At(Gw'*noise));  % Apply F Phi^T
+    stdn = std(rn(:));
+    param.stdn = stdn;
+    th = gamma * stdn / x2;
 %     th_dirty = gamma * std(rn(:)) / dirty2;
-%     param.maxd = max(d);
-%     param.th = th;
+    param.maxd = max(d);
+    param.th = th;
 %     param.th_dirty = th_dirty;
-%     param.singInit = d;
+    param.singInit = d;
     fprintf('\nThe estimate threshold using ground truth is %e \n', th);
 %     fprintf('\nThe estimate threshold using dirty image is %e \n', th_dirty);
-    Mask = (d >= th_dirty);
+    Mask = (d >= th);
 end
 d = d(Mask);
 fprintf('\nThe threshold is %e \n', min(d));

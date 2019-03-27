@@ -12,7 +12,7 @@ elseif gen_data == 1
     param_sampling.N = N; % number of pixels in the image
     param_sampling.Nox = ox*Nx; % number of pixels in the image
     param_sampling.Noy = oy*Ny; % number of pixels in the image
-%     param_sampling.sigma = sigma_gaussian;
+    param_sampling.sigma = sigma_gaussian;
     util_gen_sampling_pattern_config; % Set all parameters
 
     [~, ~, uw, vw, ~] = util_gen_sampling_pattern(sampling_pattern, param_sampling);
@@ -104,64 +104,68 @@ if param_fouRed.enable_estimatethreshold
 %     param_fouRed.factor2 = sum(abs(psf(:)))/sqrt(N);
 %     param_fouRed.factor3 = norm((abs(psf)))/sqrt(N);
 %     param_fouRed.dirty2 = norm(At(Gw' * y{1}{1}))/sqrt(N);
-    param_fouRed.dirty2 = norm(Phi_t(y{1}{1}))/sqrt(N);
-    param_fouRed.sigma_noise = sigma_noise;
+    param_fouRed.dirty2 = norm(Phi_t(y{1}{1}));
+    if normalize_data
+        param_fouRed.sigma_noise = 1;
+    else
+        param_fouRed.sigma_noise = sigma_noise;
+    end
 end
 
 fprintf('\nDimensionality reduction...');
 % psf operator Ipsf, singular value matrix Sigma, mask matrix (to reduce the dimension)
-[Ipsf, Mask, Sigma, FIpsf, FIpsf_t] = fourierReduction(Gw, A, At, [Ny, Nx], W, param_fouRed);
+[Ipsf, Mask, Sigma, FIpsf, FIpsf_t, param_fouRed] = fourierReduction(Gw, A, At, [Ny, Nx], W, param_fouRed);
 % New measurement operator C, new reduced measurement operator B
 % [C, Ct, B, Bt] = oper_fourierReduction(Ipsf, Sigma, Mask, [Ny, Nx]);
 fprintf('\nDimensionality reduction is finished');
 
-% Embed the y and noise using the same reduction
-for k = 1:num_tests
-    yTmat = operatorR(y{k}{1}, Phi_t, Sigma, Mask);
-    noiseMat = operatorR(noise{k}{1}, Phi_t, Sigma, Mask);
-    % Data splitting 
-    if usingReductionPar
-        [yT{k}, rn{k}, T, W] = util_gen_sing_block_structure(yTmat, noiseMat, Sigma, Mask, param_sing_block_structure);
-    else
-        T = {Sigma};
-        W = {Mask};
-        yT{k} = {yTmat};
-        rn{k} = {noiseMat};
-    end
-end
-
-clear noise yTmat noiseMat;
-
-R = length(W);
-for q = 1:R
-    aW{q} = 1./T{q};
-end
-
-if usingPrecondition
-    evl = op_norm(@(x) sqrt(cell2mat(aW)) .* operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        @(x) operatorRPhit(sqrt(cell2mat(aW)) .* x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        [Ny, Nx], 1e-6, 200, verbosity);
-else
-    evl = op_norm(@(x) operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        @(x) operatorRPhit(x, Ipsf, Sigma, Mask, [Ny, Nx]), [Ny, Nx], 1e-4, 200, verbosity); 
-end
-
-%Bound for the L2 norm
-fprintf('Computing epsilon bound... ');
-tstart1=tic;      
-
-% Embed the noise
-for k = 1:num_tests
-    % factorized by singular values and compute l2 ball       
-    for q = 1:length(T)
-        epsilonT{k}{q} = norm(rn{k}{q});
-        epsilonTs{k}{q} = 1.001*epsilonT{k}{q};
-    end
-    epsilon{k} = norm(cell2mat(epsilonT{k}));
-    epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
-end
-
-    %%%%%%%%%%%%%%%
-fprintf('Done\n');
-tend1=toc(tstart1);
-fprintf('Time: %e\n', tend1);
+% % Embed the y and noise using the same reduction
+% for k = 1:num_tests
+%     yTmat = operatorR(y{k}{1}, Phi_t, Sigma, Mask);
+%     noiseMat = operatorR(noise{k}{1}, Phi_t, Sigma, Mask);
+%     % Data splitting 
+%     if usingReductionPar
+%         [yT{k}, rn{k}, T, W] = util_gen_sing_block_structure(yTmat, noiseMat, Sigma, Mask, param_sing_block_structure);
+%     else
+%         T = {Sigma};
+%         W = {Mask};
+%         yT{k} = {yTmat};
+%         rn{k} = {noiseMat};
+%     end
+% end
+% 
+% clear noise yTmat noiseMat;
+% 
+% R = length(W);
+% for q = 1:R
+%     aW{q} = 1./T{q};
+% end
+% 
+% if usingPrecondition
+%     evl = op_norm(@(x) sqrt(cell2mat(aW)) .* operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
+%         @(x) operatorRPhit(sqrt(cell2mat(aW)) .* x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
+%         [Ny, Nx], 1e-6, 200, verbosity);
+% else
+%     evl = op_norm(@(x) operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
+%         @(x) operatorRPhit(x, Ipsf, Sigma, Mask, [Ny, Nx]), [Ny, Nx], 1e-4, 200, verbosity); 
+% end
+% 
+% %Bound for the L2 norm
+% fprintf('Computing epsilon bound... ');
+% tstart1=tic;      
+% 
+% % Embed the noise
+% for k = 1:num_tests
+%     % factorized by singular values and compute l2 ball       
+%     for q = 1:length(T)
+%         epsilonT{k}{q} = norm(rn{k}{q});
+%         epsilonTs{k}{q} = 1.001*epsilonT{k}{q};
+%     end
+%     epsilon{k} = norm(cell2mat(epsilonT{k}));
+%     epsilons{k} = 1.001*epsilon{k};     % data fidelity error * 1.001
+% end
+% 
+%     %%%%%%%%%%%%%%%
+% fprintf('Done\n');
+% tend1=toc(tstart1);
+% fprintf('Time: %e\n', tend1);
