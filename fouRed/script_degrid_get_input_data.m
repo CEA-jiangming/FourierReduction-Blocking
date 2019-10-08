@@ -1,7 +1,4 @@
 %% generate the sampling pattern
-FT2 = @(x) fftshift(fft2(ifftshift(x)));
-IFT2 = @(x) fftshift(ifft2(ifftshift(x)));
-
 if gen_data == 0
     fprintf('Loading data from disk ... \n\n');
     load(uvfile)
@@ -96,9 +93,6 @@ if normalize_data
     end
 end
 
-Phi = @(x) operatorPhi(x, Gw, A);
-Phi_t = @(x) operatorPhit(x, Gw', At);
-
 %% For dimensionality reduction
 if param_fouRed.enable_estimatethreshold
     param_fouRed.x2 = norm(im);
@@ -118,16 +112,51 @@ if param_fouRed.enable_estimatethreshold
 end
 
 fprintf('\nDimensionality reduction...');
-% psf operator Ipsf, singular value matrix Sigma, mask matrix (to reduce the dimension)
-[Ipsf, Mask, Sigma, FIpsf, FIpsf_t, param_fouRed] = fourierReduction(Gw, A, At, [Ny, Nx], W, param_fouRed);
-% New measurement operator C, new reduced measurement operator B
-% [C, Ct, B, Bt] = oper_fourierReduction(Ipsf, Sigma, Mask, [Ny, Nx]);
+
+% Reduction using gridding kernel
+H = Gw' * Gw;
+d = full(abs(diag(H)));
+
+if param_fouRed.enable_klargestpercent
+    Mask = (d >= prctile(d,100-klargestpercent));
+elseif param.enable_estimatethreshold
+    % Embed the noise
+    noise = sigma_noise/sqrt(2) * (randn(size(Gw, 1),1) + 1j * randn(size(Gw, 1), 1));
+    rn = FT2(At(Gw'*noise));  % Apply F Phi^T
+    stdn = std(rn(:));
+    param.stdn = stdn;
+    th = gamma * stdn / x2;
+%     th_dirty = gamma * std(rn(:)) / dirty2;
+%     param.maxd = max(d);
+%     param.th = th;
+%     param.th_dirty = th_dirty;
+%     param.singInit = d;
+    fprintf('\nThe estimate threshold using ground truth is %e \n', th);
+%     fprintf('\nThe estimate threshold using dirty image is %e \n', th_dirty);
+    Mask = (d >= th);
+    th_per = sum(Mask) / numel(Mask) * 100;
+    fprintf('%f%% data are kept\n', th_per);
+end
+d = d(Mask);
+fprintf('\nThe threshold is %e \n', min(d));
+
+d = max(1.e-10, d);  % This ensures that inverting the values will not explode in computation
+Sigma = 1./sqrt(d);
+
+FIpsf = @(x) H * A(x);
+FIpsf_t = @(x) At(H*x);
 fprintf('\nDimensionality reduction is finished');
 
 % Embed the y and noise using the same reduction
 for k = 1:num_tests
-    yTmat = operatorR(y{k}{1}, Phi_t, Sigma, Mask);
-    noiseMat = operatorR(noise{k}{1}, Phi_t, Sigma, Mask);
+%     norm_y = norm(y{k}{1})/sqrt(numel(y{k}{1}));
+    y_tmp = Gw' * y{k}{1};
+    yTmat = Sigma .* y_tmp(Mask);
+%     norm_yT = norm(yTmat)/sqrt(numel(yTmat));
+%     precond_factor = norm_yT / norm_y;
+%     fprintf('Precondition factor=%f\n', precond_factor);
+    noise_tmp = Gw' * noise{k}{1};
+    noiseMat = Sigma .* noise_tmp(Mask);
     % Data splitting 
     if usingReductionPar
         [yT{k}, rn{k}, T, W] = util_gen_sing_block_structure(yTmat, noiseMat, Sigma, Mask, param_sing_block_structure);
@@ -143,18 +172,19 @@ clear noise yTmat noiseMat;
 
 R = length(W);
 for q = 1:R
-%     aWw_tmp = operatorR(aWw, Phi_t, Sigma, Mask);
-%     aW = {aWw_tmp};
-    aW{q} = 1./T{q};
+    aWw_tmp = abs(Gw' * aWw);
+    aW = {Sigma .* aWw_tmp(Mask)};
+%     aW{q} = 1./T{q};
 end
 
 if usingPrecondition
-    evl = op_norm(@(x) sqrt(cell2mat(aW)) .* operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        @(x) operatorRPhit(sqrt(cell2mat(aW)) .* x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        [Ny, Nx], 1e-6, 200, verbosity);
+    evl = op_norm(@(x) sqrt(cell2mat(aW)) .* operatorGtPhi(x, H, A, Sigma, Mask), ... 
+    @(x) operatorGtPhi_t(sqrt(cell2mat(aW)) .* x, H, At, Sigma, Mask, [oy*Ny, ox*Nx]), ...
+        [Ny, Nx], 1e-10, 200, verbosity);
 else
-    evl = op_norm(@(x) operatorRPhi(x, Ipsf, Sigma, Mask, [Ny, Nx]), ...
-        @(x) operatorRPhit(x, Ipsf, Sigma, Mask, [Ny, Nx]), [Ny, Nx], 1e-4, 200, verbosity); 
+    evl = op_norm(@(x) operatorGtPhi(x, H, A, Sigma, Mask), ...
+        @(x) operatorGtPhi_t(x, H, At, Sigma, Mask, [oy*Ny, ox*Nx]),...
+        [Ny, Nx], 1e-10, 200, verbosity); 
 end
 
 %Bound for the L2 norm

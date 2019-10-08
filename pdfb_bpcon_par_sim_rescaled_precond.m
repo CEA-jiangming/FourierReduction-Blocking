@@ -1,4 +1,4 @@
-function [xsol, L1_v, L1_vp, L2_v, L2_vp, delta_v, sol_v, snr_v, no_sub_itr_v, v1, v2, sol_best_bound_v, sol_reweight_v] = pdfb_bpcon_par_sim_rescaled_precond(y, epsilont, epsilonts, epsilon, epsilons, A, At, T, pU, W, Psi, Psit, Psiw, Psitw, param)
+function [xsol, L1_v, L1_vp, L2_v, L2_vp, delta_v, sol_v, snr_v, time_v, no_sub_itr_v, v1, v2, sol_best_bound_v, sol_reweight_v] = pdfb_bpcon_par_sim_rescaled_precond(y, epsilont, epsilonts, epsilon, epsilons, A, At, T, pU, W, Psi, Psit, Psiw, Psitw, param)
 %
 % [xsol, L1_v, L1_vp, L2_v, L2_vp] = pdfb_bpcon_par_sim(y, epsilon, A, At, T, W, Psi, Psit, param) solves:
 %
@@ -240,6 +240,7 @@ sol_best_bound_v = zeros(0, Ny, Nx);
 sol_reweight_v = zeros(0, Ny, Nx);
 
 snr_v = zeros(param.max_iter, 1);
+time_v = zeros(param.max_iter, 1);
 
 %% useful functions for the projection
 % thresholding negative values
@@ -387,6 +388,11 @@ for t = 1:param.max_iter
     g2 = g2 + At(uu);
     
     tm = toc(tm);
+    if t == 1
+        time_v(1) = tm;
+    else
+        time_v(t) = tm + time_v(t-1);
+    end
           
     %% stopping criterion and logs
  
@@ -551,6 +557,7 @@ if (param.verbose >= 0.5)
     delta_v = delta_v(1:t);
     sol_v = sol_v(1:sol_step_count-1, :, :);
     snr_v = snr_v(1:t);
+    time_v = time_v(1:t);
     no_sub_itr_v = {no_sub_itr_v{1:t}}';
 end
 

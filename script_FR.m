@@ -3,11 +3,11 @@ clear variables
 clc
 
 usingReduction = 1;
-normalize_data = 1;
-usingPrecondition = 0;
-enable_klargestpercent = 0;
-klargestpercent = 50;
-enable_estimatethreshold = 1;
+normalize_data = 0;
+usingPrecondition = 1;
+enable_klargestpercent = 1;
+klargestpercent = 30;
+enable_estimatethreshold = 0;
 gamma = 3;
 ratio = 10;
 input_snr = 40;
@@ -29,8 +29,8 @@ end
 
 rng('shuffle');
 
-for i = 1:length(sigma_gaussian)
-    param_fouRed_uv_128{i} = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr, sigma_gaussian(i));
+for i = 1:length(input_snr)
+    result{i} = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr);
 end
 
 % result_precond_ratio50 = parallel_FR_pd(usingReduction, normalize_data, usingPrecondition, enable_klargestpercent, klargestpercent, enable_estimatethreshold, gamma, ratio, input_snr);
